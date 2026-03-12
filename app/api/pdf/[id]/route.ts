@@ -76,7 +76,7 @@ export async function GET(
   try {
     const pdfBuffer = await runPdfScript(pdfData);
 
-    return new Response(pdfBuffer, {
+    return new Response(new Uint8Array(pdfBuffer), {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `inline; filename="contrato-${contract.adult_dni}.pdf"`,
