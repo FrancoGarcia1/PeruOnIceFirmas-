@@ -36,9 +36,9 @@ export default async function DashboardPage({
 
   return (
     <div>
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">Contratos</h2>
-        <p className="text-gray-500 mt-1">
+      <div className="mb-8">
+        <h2 className="text-xl md:text-2xl font-bold text-dark">Contratos</h2>
+        <p className="text-dark-soft/60 mt-1 text-sm">
           {count ?? 0} contrato{count !== 1 ? "s" : ""} registrado
           {count !== 1 ? "s" : ""}
         </p>
