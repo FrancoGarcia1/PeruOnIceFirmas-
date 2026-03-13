@@ -1,34 +1,59 @@
 import { createSupabaseServer } from "@/lib/supabase-server";
 import DailyReportCharts from "@/components/DailyReportCharts";
 
-function startOfDay(date: Date): Date {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  return d;
+const PERU_TZ = "America/Lima"; // UTC-5, no DST
+
+/** Get current date parts in Peru timezone */
+function peruNow(): Date {
+  const utc = new Date();
+  // Format in Peru TZ to extract components
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: PERU_TZ,
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+    hour12: false,
+  }).formatToParts(utc);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "0";
+  return new Date(`${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}:${get("second")}-05:00`);
 }
 
-function endOfDay(date: Date): Date {
-  const d = new Date(date);
-  d.setHours(23, 59, 59, 999);
-  return d;
+/** Start of day in Peru time, returned as UTC ISO string for Supabase queries */
+function peruStartOfDay(daysOffset: number): string {
+  const now = peruNow();
+  const d = new Date(now);
+  d.setDate(d.getDate() + daysOffset);
+  // Set to 00:00:00 Peru time = 05:00:00 UTC
+  const dateStr = d.toISOString().split("T")[0];
+  return new Date(`${dateStr}T00:00:00-05:00`).toISOString();
+}
+
+/** End of day in Peru time, returned as UTC ISO string for Supabase queries */
+function peruEndOfDay(daysOffset: number): string {
+  const now = peruNow();
+  const d = new Date(now);
+  d.setDate(d.getDate() + daysOffset);
+  const dateStr = d.toISOString().split("T")[0];
+  return new Date(`${dateStr}T23:59:59.999-05:00`).toISOString();
+}
+
+/** Convert a UTC ISO timestamp to Peru hour (0-23) */
+function toPeruHour(isoString: string): number {
+  const date = new Date(isoString);
+  const hourStr = new Intl.DateTimeFormat("en-US", {
+    timeZone: PERU_TZ, hour: "2-digit", hour12: false,
+  }).format(date);
+  return parseInt(hourStr, 10);
 }
 
 export default async function ReportsPage() {
   const supabase = await createSupabaseServer();
 
-  const now = new Date();
-  const todayStart = startOfDay(now);
-  const todayEnd = endOfDay(now);
-
-  const yesterday = new Date(now);
-  yesterday.setDate(yesterday.getDate() - 1);
-  const yesterdayStart = startOfDay(yesterday);
-  const yesterdayEnd = endOfDay(yesterday);
-
-  const lastWeekSameDay = new Date(now);
-  lastWeekSameDay.setDate(lastWeekSameDay.getDate() - 7);
-  const lwStart = startOfDay(lastWeekSameDay);
-  const lwEnd = endOfDay(lastWeekSameDay);
+  const todayStart = peruStartOfDay(0);
+  const todayEnd = peruEndOfDay(0);
+  const yesterdayStart = peruStartOfDay(-1);
+  const yesterdayEnd = peruEndOfDay(-1);
+  const lwStart = peruStartOfDay(-7);
+  const lwEnd = peruEndOfDay(-7);
 
   const [
     { data: todayContracts },
@@ -39,31 +64,30 @@ export default async function ReportsPage() {
     supabase
       .from("contracts")
       .select("id, adult_name, adult_dni, adult_age, signed_at")
-      .gte("signed_at", todayStart.toISOString())
-      .lte("signed_at", todayEnd.toISOString())
+      .gte("signed_at", todayStart)
+      .lte("signed_at", todayEnd)
       .order("signed_at", { ascending: true }),
     supabase
       .from("contracts")
       .select("*", { count: "exact", head: true })
-      .gte("signed_at", yesterdayStart.toISOString())
-      .lte("signed_at", yesterdayEnd.toISOString()),
+      .gte("signed_at", yesterdayStart)
+      .lte("signed_at", yesterdayEnd),
     supabase
       .from("contracts")
       .select("*", { count: "exact", head: true })
-      .gte("signed_at", lwStart.toISOString())
-      .lte("signed_at", lwEnd.toISOString()),
+      .gte("signed_at", lwStart)
+      .lte("signed_at", lwEnd),
     supabase
       .from("minors")
       .select("contract_id")
       .in(
         "contract_id",
-        // subquery: get today's contract ids
         (
           await supabase
             .from("contracts")
             .select("id")
-            .gte("signed_at", todayStart.toISOString())
-            .lte("signed_at", todayEnd.toISOString())
+            .gte("signed_at", todayStart)
+            .lte("signed_at", todayEnd)
         ).data?.map((c) => c.id) ?? []
       ),
   ]);
@@ -86,11 +110,11 @@ export default async function ReportsPage() {
     .filter((a): a is number => a != null && a > 0);
   const avgAge = ages.length > 0 ? Math.round(ages.reduce((s, a) => s + a, 0) / ages.length) : 0;
 
-  // Hourly breakdown
+  // Hourly breakdown (Peru timezone)
   const hourlyCounts: Record<number, number> = {};
   for (let h = 0; h < 24; h++) hourlyCounts[h] = 0;
   contracts.forEach((c) => {
-    const hour = new Date(c.signed_at).getHours();
+    const hour = toPeruHour(c.signed_at);
     hourlyCounts[hour]++;
   });
 
@@ -122,7 +146,8 @@ export default async function ReportsPage() {
     { name: "Con menores", value: withMinorsCount },
   ];
 
-  const dateFormatted = now.toLocaleDateString("es-PE", {
+  const dateFormatted = new Date().toLocaleDateString("es-PE", {
+    timeZone: PERU_TZ,
     weekday: "long",
     year: "numeric",
     month: "long",

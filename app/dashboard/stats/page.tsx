@@ -1,15 +1,24 @@
 import { createSupabaseServer } from "@/lib/supabase-server";
 import StatsCharts from "@/components/StatsCharts";
 
+const PERU_TZ = "America/Lima";
+
+function peruStartOfDay(daysOffset: number): string {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: PERU_TZ, year: "numeric", month: "2-digit", day: "2-digit", hour12: false,
+  }).formatToParts(new Date());
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "0";
+  const base = new Date(`${get("year")}-${get("month")}-${get("day")}T00:00:00-05:00`);
+  base.setDate(base.getDate() + daysOffset);
+  return base.toISOString();
+}
+
 export default async function StatsPage() {
   const supabase = await createSupabaseServer();
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const weekAgo = new Date();
-  weekAgo.setDate(weekAgo.getDate() - 7);
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const today = peruStartOfDay(0);
+  const weekAgo = peruStartOfDay(-7);
+  const thirtyDaysAgo = peruStartOfDay(-30);
 
   const [
     { count: totalContracts },
@@ -22,29 +31,27 @@ export default async function StatsPage() {
     supabase
       .from("contracts")
       .select("*", { count: "exact", head: true })
-      .gte("signed_at", today.toISOString()),
+      .gte("signed_at", today),
     supabase
       .from("contracts")
       .select("*", { count: "exact", head: true })
-      .gte("signed_at", weekAgo.toISOString()),
+      .gte("signed_at", weekAgo),
     supabase
       .from("contracts")
       .select("signed_at")
-      .gte("signed_at", thirtyDaysAgo.toISOString())
+      .gte("signed_at", thirtyDaysAgo)
       .order("signed_at", { ascending: true }),
     supabase.from("minors").select("*", { count: "exact", head: true }),
   ]);
 
   const dailyCounts: Record<string, number> = {};
   for (let i = 29; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    const key = d.toISOString().split("T")[0];
-    dailyCounts[key] = 0;
+    const peruDate = new Intl.DateTimeFormat("en-CA", { timeZone: PERU_TZ }).format(new Date(peruStartOfDay(-i)));
+    dailyCounts[peruDate] = 0;
   }
 
   recentContracts?.forEach((c) => {
-    const day = new Date(c.signed_at).toISOString().split("T")[0];
+    const day = new Intl.DateTimeFormat("en-CA", { timeZone: PERU_TZ }).format(new Date(c.signed_at));
     if (dailyCounts[day] !== undefined) {
       dailyCounts[day]++;
     }
