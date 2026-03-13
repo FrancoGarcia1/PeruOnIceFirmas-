@@ -64,6 +64,7 @@ export async function GET(
   const pdfData = JSON.stringify({
     adultName: contract.adult_name,
     adultDni: contract.adult_dni,
+    adultAge: contract.adult_age,
     signedAt: contract.signed_at,
     signatureBase64,
     minors: (contract.minors ?? []).map((m: { minor_name: string; minor_dni: string | null; minor_age: number }) => ({

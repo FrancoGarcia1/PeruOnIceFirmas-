@@ -15,6 +15,7 @@ interface Contract {
   id: string;
   adult_name: string;
   adult_dni: string;
+  adult_age: number | null;
   signature_url: string | null;
   signed_at: string;
   minors: Minor[];

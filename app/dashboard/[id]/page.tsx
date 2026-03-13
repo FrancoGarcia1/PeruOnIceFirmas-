@@ -70,6 +70,16 @@ export default async function ContractDetailPage({
                   {contract.adult_dni}
                 </dd>
               </div>
+              {contract.adult_age && (
+                <div>
+                  <dt className="text-[10px] font-semibold text-dark-soft/50 uppercase tracking-wider">
+                    Edad
+                  </dt>
+                  <dd className="text-dark mt-0.5">
+                    {contract.adult_age} años
+                  </dd>
+                </div>
+              )}
               <div>
                 <dt className="text-[10px] font-semibold text-dark-soft/50 uppercase tracking-wider">
                   Fecha de firma

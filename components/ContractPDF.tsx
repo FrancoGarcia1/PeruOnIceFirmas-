@@ -352,7 +352,7 @@ export default function ContractPDF({
           día de hoy, conforme a lo señalado en el artículo 15° del Código Civil
           peruano. Por lo tanto, autorizo su utilización y aprovechamiento para
           fines publicitarios, en general, para su difusión en actividades,
-          intereses o funciones de Perú sobre Hielo Arena en todo medio, sin
+          intereses o funciones de Perú On Ice en todo medio, sin
           limitaciones en el número de su uso, durante dos (2) años a partir de
           su primera exposición en medios masivos.
         </Text>
