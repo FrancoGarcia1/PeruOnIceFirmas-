@@ -92,7 +92,7 @@ function generateExcel(period: Period, data: Awaited<ReturnType<typeof fetchRepo
     ["Nombre", "DNI", "Edad", "Fecha y hora (Lima)", "Menores asociados"],
     ...data.items.map((c) => {
       const fecha = new Date(c.signed_at).toLocaleString("es-PE", { timeZone: PERU_TZ });
-      const menores = data.minors.filter((m) => m.contract_id === c.id).map((m) => `${m.minor_name} (${m.minor_age})`).join(", ");
+      const menores = data.minors.filter((m) => m.contract_id === c.id).map((m) => `${m.minor_name} - DNI: ${m.minor_dni ?? "—"} (${m.minor_age} años)`).join(", ");
       return [c.adult_name, c.adult_dni, c.adult_age ?? "—", fecha, menores || "Ninguno"];
     }),
   ];
@@ -134,7 +134,7 @@ async function generatePDF(period: Period, data: Awaited<ReturnType<typeof fetch
     contracts: data.items.map((c) => ({
       name: c.adult_name, dni: c.adult_dni, age: c.adult_age,
       signedAt: new Date(c.signed_at).toLocaleString("es-PE", { timeZone: PERU_TZ }),
-      minors: data.minors.filter((m) => m.contract_id === c.id).map((m) => `${m.minor_name} (${m.minor_age})`).join(", ") || "—",
+      minors: data.minors.filter((m) => m.contract_id === c.id).map((m) => `${m.minor_name} - DNI: ${m.minor_dni ?? "—"} (${m.minor_age} años)`).join(", ") || "—",
     })),
     period,
   });
