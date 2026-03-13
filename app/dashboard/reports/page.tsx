@@ -1,63 +1,9 @@
 import { createSupabaseServer } from "@/lib/supabase-server";
+import { getDateRange, toPeruHour, toPeruDate, peruDateStr, AGE_RANGES, PERIOD_LABELS, PERU_TZ } from "@/lib/peru-dates";
+import type { Period } from "@/lib/peru-dates";
 import DailyReportCharts from "@/components/DailyReportCharts";
 import ReportPeriodSelector from "@/components/ReportPeriodSelector";
 import ReportExportBar from "@/components/ReportExportBar";
-
-const PERU_TZ = "America/Lima";
-
-function peruDateStr(daysOffset: number): string {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: PERU_TZ, year: "numeric", month: "2-digit", day: "2-digit", hour12: false,
-  }).formatToParts(new Date());
-  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "0";
-  const base = new Date(`${get("year")}-${get("month")}-${get("day")}T00:00:00-05:00`);
-  base.setDate(base.getDate() + daysOffset);
-  return base.toISOString().split("T")[0];
-}
-
-function toUTCIso(dateStr: string, time: "start" | "end"): string {
-  const t = time === "start" ? "T00:00:00-05:00" : "T23:59:59.999-05:00";
-  return new Date(`${dateStr}${t}`).toISOString();
-}
-
-function toPeruHour(iso: string): number {
-  return parseInt(new Intl.DateTimeFormat("en-US", { timeZone: PERU_TZ, hour: "2-digit", hour12: false }).format(new Date(iso)), 10);
-}
-
-function toPeruDate(iso: string): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: PERU_TZ }).format(new Date(iso));
-}
-
-const AGE_RANGES = [
-  { label: "5-9", min: 5, max: 9 },
-  { label: "10-15", min: 10, max: 15 },
-  { label: "16-17", min: 16, max: 17 },
-  { label: "18-25", min: 18, max: 25 },
-  { label: "26-35", min: 26, max: 35 },
-  { label: "36-50", min: 36, max: 50 },
-  { label: "51+", min: 51, max: 999 },
-];
-
-type Period = "daily" | "weekly" | "monthly";
-
-function getDateRange(period: Period) {
-  const todayStr = peruDateStr(0);
-  switch (period) {
-    case "daily":
-      return { start: toUTCIso(todayStr, "start"), end: toUTCIso(todayStr, "end"), prevStart: toUTCIso(peruDateStr(-1), "start"), prevEnd: toUTCIso(peruDateStr(-1), "end"), compStart: toUTCIso(peruDateStr(-7), "start"), compEnd: toUTCIso(peruDateStr(-7), "end") };
-    case "weekly":
-      return { start: toUTCIso(peruDateStr(-6), "start"), end: toUTCIso(todayStr, "end"), prevStart: toUTCIso(peruDateStr(-13), "start"), prevEnd: toUTCIso(peruDateStr(-7), "end"), compStart: toUTCIso(peruDateStr(-13), "start"), compEnd: toUTCIso(peruDateStr(-7), "end") };
-    case "monthly":
-      return { start: toUTCIso(peruDateStr(-29), "start"), end: toUTCIso(todayStr, "end"), prevStart: toUTCIso(peruDateStr(-59), "start"), prevEnd: toUTCIso(peruDateStr(-30), "end"), compStart: toUTCIso(peruDateStr(-59), "start"), compEnd: toUTCIso(peruDateStr(-30), "end") };
-  }
-}
-
-const PERIOD_LABELS: Record<Period, string> = { daily: "Hoy", weekly: "Esta semana", monthly: "Este mes" };
-const COMP_LABELS: Record<Period, [string, string]> = {
-  daily: ["Ayer", "Mismo día sem. pasada"],
-  weekly: ["Semana anterior", "Semana anterior"],
-  monthly: ["Mes anterior", "Mes anterior"],
-};
 
 interface PageProps {
   searchParams: Promise<{ period?: string }>;
@@ -75,7 +21,6 @@ export default async function ReportsPage({ searchParams }: PageProps) {
     supabase.from("minors").select("contract_id, minor_age").in("contract_id", (await supabase.from("contracts").select("id").gte("signed_at", range.start).lte("signed_at", range.end)).data?.map((c) => c.id) ?? []),
   ]);
 
-  // Also get second comparison for daily mode
   let compCount = prevCount;
   if (period === "daily") {
     const { count } = await supabase.from("contracts").select("*", { count: "exact", head: true }).gte("signed_at", range.compStart).lte("signed_at", range.compEnd);
@@ -94,14 +39,9 @@ export default async function ReportsPage({ searchParams }: PageProps) {
   const ages = items.map((c) => c.adult_age).filter((a): a is number => a != null && a > 0);
   const avgAge = ages.length > 0 ? Math.round(ages.reduce((s, a) => s + a, 0) / ages.length) : 0;
 
-  // Age demographics: combine adult ages + minor ages
   const allAges = [...ages, ...minors.map((m) => m.minor_age).filter((a): a is number => a != null && a > 0)];
-  const ageRanges = AGE_RANGES.map(({ label, min, max }) => ({
-    range: label,
-    count: allAges.filter((a) => a >= min && a <= max).length,
-  }));
+  const ageRanges = AGE_RANGES.map(({ label, min, max }) => ({ range: label, count: allAges.filter((a) => a >= min && a <= max).length }));
 
-  // Hourly/daily breakdown depending on period
   let hourlyData: { hour: string; contratos: number }[];
   let peakHour = "—";
   let peakCount = 0;
@@ -113,29 +53,22 @@ export default async function ReportsPage({ searchParams }: PageProps) {
     hourlyData = Object.entries(counts).map(([h, n]) => ({ hour: `${h.padStart(2, "0")}:00`, contratos: n }));
     Object.entries(counts).forEach(([h, n]) => { if (n > peakCount) { peakCount = n; peakHour = `${h.padStart(2, "0")}:00`; } });
   } else {
-    const dayCounts: Record<string, number> = {};
     const days = period === "weekly" ? 7 : 30;
-    for (let i = days - 1; i >= 0; i--) {
-      dayCounts[peruDateStr(-i)] = 0;
-    }
+    const dayCounts: Record<string, number> = {};
+    for (let i = days - 1; i >= 0; i--) dayCounts[peruDateStr(-i)] = 0;
     items.forEach((c) => { const d = toPeruDate(c.signed_at); if (dayCounts[d] !== undefined) dayCounts[d]++; });
-    hourlyData = Object.entries(dayCounts).map(([d, n]) => {
-      const short = new Date(d + "T12:00:00").toLocaleDateString("es-PE", { day: "2-digit", month: "2-digit" });
-      return { hour: short, contratos: n };
-    });
+    hourlyData = Object.entries(dayCounts).map(([d, n]) => ({ hour: new Date(d + "T12:00:00").toLocaleDateString("es-PE", { day: "2-digit", month: "2-digit" }), contratos: n }));
     Object.entries(dayCounts).forEach(([d, n]) => {
-      if (n > peakCount) {
-        peakCount = n;
-        peakHour = new Date(d + "T12:00:00").toLocaleDateString("es-PE", { weekday: "short", day: "2-digit", month: "2-digit" });
-      }
+      if (n > peakCount) { peakCount = n; peakHour = new Date(d + "T12:00:00").toLocaleDateString("es-PE", { weekday: "short", day: "2-digit", month: "2-digit" }); }
     });
   }
 
   const periodLabel = PERIOD_LABELS[period];
+  const compLabels: Record<Period, [string, string]> = { daily: ["Ayer", "Mismo día sem. pasada"], weekly: ["Semana anterior", "Semana anterior"], monthly: ["Mes anterior", "Mes anterior"] };
   const comparison = [
     { label: periodLabel, value: totalContracts },
-    { label: COMP_LABELS[period][0], value: prevCount ?? 0 },
-    ...(period === "daily" ? [{ label: COMP_LABELS[period][1], value: compCount ?? 0 }] : []),
+    { label: compLabels[period][0], value: prevCount ?? 0 },
+    ...(period === "daily" ? [{ label: compLabels[period][1], value: compCount ?? 0 }] : []),
   ];
 
   const typeBreakdown = [
@@ -143,9 +76,7 @@ export default async function ReportsPage({ searchParams }: PageProps) {
     { name: "Con menores", value: withMinorsCount },
   ];
 
-  const dateFormatted = new Date().toLocaleDateString("es-PE", {
-    timeZone: PERU_TZ, weekday: "long", year: "numeric", month: "long", day: "numeric",
-  });
+  const dateFormatted = new Date().toLocaleDateString("es-PE", { timeZone: PERU_TZ, weekday: "long", year: "numeric", month: "long", day: "numeric" });
 
   const CARDS = [
     { label: "Contratos", value: totalContracts, color: "burgundy" as const, icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg> },
@@ -163,7 +94,6 @@ export default async function ReportsPage({ searchParams }: PageProps) {
 
   return (
     <div>
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
           <h2 className="text-xl md:text-2xl font-bold text-dark">Reportes</h2>
@@ -171,11 +101,10 @@ export default async function ReportsPage({ searchParams }: PageProps) {
         </div>
         <div className="flex flex-col sm:flex-row gap-3">
           <ReportPeriodSelector />
-          <ReportExportBar data={{ periodLabel, totalContracts, soloAdults: soloAdultCount, withMinors: withMinorsCount, totalMinors, totalPeople, avgAge, hourlyData, ageRanges }} />
+          <ReportExportBar />
         </div>
       </div>
 
-      {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-5 mb-8">
         {CARDS.map((card) => {
           const c = colorMap[card.color];
@@ -193,10 +122,8 @@ export default async function ReportsPage({ searchParams }: PageProps) {
         })}
       </div>
 
-      {/* Charts */}
       <DailyReportCharts hourlyData={hourlyData} comparison={comparison} typeBreakdown={typeBreakdown} ageRanges={ageRanges} peakHour={peakHour} peakCount={peakCount} periodLabel={periodLabel} />
 
-      {/* Detail table */}
       {totalContracts > 0 && (
         <div className="mt-6 bg-white rounded-2xl border border-ice-dark/40 shadow-sm overflow-hidden">
           <div className="h-1.5 bg-gradient-to-r from-purple-400 to-purple-100" />
