@@ -26,6 +26,7 @@ interface Props {
   search: string;
   currentPage: number;
   totalPages: number;
+  basePath?: string;
 }
 
 export default function ContractTable({
@@ -33,6 +34,7 @@ export default function ContractTable({
   search,
   currentPage,
   totalPages,
+  basePath = "/dashboard",
 }: Props) {
   const router = useRouter();
   const [query, setQuery] = useState(search);
@@ -41,7 +43,7 @@ export default function ContractTable({
     e.preventDefault();
     const params = new URLSearchParams();
     if (query) params.set("q", query);
-    router.push(`/dashboard?${params.toString()}`);
+    router.push(`${basePath}?${params.toString()}`);
   };
 
   const formatDate = (dateStr: string) =>
@@ -164,7 +166,7 @@ export default function ContractTable({
                     <td className="px-6 py-4 text-right">
                       <div className="flex gap-2 justify-end">
                         <Link
-                          href={`/dashboard/${contract.id}`}
+                          href={`${basePath}/${contract.id}`}
                           className="px-3.5 py-1.5 text-sm bg-burgundy/10 text-burgundy rounded-lg hover:bg-burgundy/20 transition-colors font-semibold"
                         >
                           Ver
@@ -242,7 +244,7 @@ export default function ContractTable({
 
               <div className="flex gap-2">
                 <Link
-                  href={`/dashboard/${contract.id}`}
+                  href={`${basePath}/${contract.id}`}
                   className="flex-1 text-center px-3 py-2 text-sm bg-burgundy/10 text-burgundy rounded-lg hover:bg-burgundy/20 transition-colors font-semibold"
                 >
                   Ver
@@ -266,7 +268,7 @@ export default function ContractTable({
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
             <Link
               key={page}
-              href={`/dashboard?page=${page}${search ? `&q=${search}` : ""}`}
+              href={`${basePath}?page=${page}${search ? `&q=${search}` : ""}`}
               className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${
                 page === currentPage
                   ? "bg-burgundy text-white shadow-md shadow-burgundy/20"

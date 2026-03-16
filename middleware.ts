@@ -29,20 +29,34 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Si no está autenticado y trata de acceder al dashboard, redirigir a login
-  if (
-    !user &&
-    request.nextUrl.pathname.startsWith("/dashboard")
-  ) {
+  const role = user?.app_metadata?.role as string | undefined;
+  const path = request.nextUrl.pathname;
+
+  // No autenticado → redirigir a login
+  if (!user && (path.startsWith("/dashboard") || path.startsWith("/caja"))) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
   }
 
-  // Si está autenticado y va a login, redirigir al dashboard
-  if (user && request.nextUrl.pathname === "/login") {
+  // Empleado intentando acceder a /dashboard → redirigir a /caja
+  if (user && role === "employee" && path.startsWith("/dashboard")) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/caja";
+    return NextResponse.redirect(url);
+  }
+
+  // Admin intentando acceder a /caja → redirigir a /dashboard
+  if (user && role === "admin" && path.startsWith("/caja")) {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
+    return NextResponse.redirect(url);
+  }
+
+  // Autenticado en /login → redirigir según rol
+  if (user && path === "/login") {
+    const url = request.nextUrl.clone();
+    url.pathname = role === "employee" ? "/caja" : "/dashboard";
     return NextResponse.redirect(url);
   }
 
@@ -50,5 +64,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/login", "/api/:path*"],
+  matcher: ["/dashboard/:path*", "/caja/:path*", "/login", "/api/:path*"],
 };

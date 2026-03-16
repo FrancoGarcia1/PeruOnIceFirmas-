@@ -1,9 +1,8 @@
 import { createSupabaseServer } from "@/lib/supabase-server";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import DeleteContractButton from "@/components/DeleteContractButton";
 
-export default async function ContractDetailPage({
+export default async function CajaContractDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>;
@@ -29,10 +28,9 @@ export default async function ContractDetailPage({
 
   return (
     <div>
-      {/* Header */}
       <div className="mb-8 flex flex-wrap items-center gap-4">
         <Link
-          href="/dashboard"
+          href="/caja"
           className="inline-flex items-center gap-2 text-sm text-burgundy hover:text-burgundy-dark font-medium transition-colors"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -41,13 +39,10 @@ export default async function ContractDetailPage({
           Volver
         </Link>
         <div className="hidden sm:block w-px h-6 bg-ice-dark" />
-        <h2 className="text-xl md:text-2xl font-bold text-dark">
-          Detalle del contrato
-        </h2>
+        <h2 className="text-xl md:text-2xl font-bold text-dark">Detalle del contrato</h2>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Datos del contrato */}
         <div className="bg-white rounded-2xl border border-ice-dark/40 shadow-sm overflow-hidden">
           <div className="h-1.5 bg-gradient-to-r from-burgundy to-burgundy-light" />
           <div className="p-4 md:p-6">
@@ -56,35 +51,21 @@ export default async function ContractDetailPage({
             </h3>
             <dl className="space-y-4">
               <div>
-                <dt className="text-[10px] font-semibold text-dark-soft/50 uppercase tracking-wider">
-                  Nombre
-                </dt>
-                <dd className="text-dark font-semibold text-lg mt-0.5">
-                  {contract.adult_name}
-                </dd>
+                <dt className="text-[10px] font-semibold text-dark-soft/50 uppercase tracking-wider">Nombre</dt>
+                <dd className="text-dark font-semibold text-lg mt-0.5">{contract.adult_name}</dd>
               </div>
               <div>
-                <dt className="text-[10px] font-semibold text-dark-soft/50 uppercase tracking-wider">
-                  DNI
-                </dt>
-                <dd className="text-dark font-mono text-base mt-0.5">
-                  {contract.adult_dni}
-                </dd>
+                <dt className="text-[10px] font-semibold text-dark-soft/50 uppercase tracking-wider">DNI</dt>
+                <dd className="text-dark font-mono text-base mt-0.5">{contract.adult_dni}</dd>
               </div>
               {contract.adult_age && (
                 <div>
-                  <dt className="text-[10px] font-semibold text-dark-soft/50 uppercase tracking-wider">
-                    Edad
-                  </dt>
-                  <dd className="text-dark mt-0.5">
-                    {contract.adult_age} años
-                  </dd>
+                  <dt className="text-[10px] font-semibold text-dark-soft/50 uppercase tracking-wider">Edad</dt>
+                  <dd className="text-dark mt-0.5">{contract.adult_age} años</dd>
                 </div>
               )}
               <div>
-                <dt className="text-[10px] font-semibold text-dark-soft/50 uppercase tracking-wider">
-                  Fecha de firma
-                </dt>
+                <dt className="text-[10px] font-semibold text-dark-soft/50 uppercase tracking-wider">Fecha de firma</dt>
                 <dd className="text-dark mt-0.5">
                   {new Date(contract.signed_at).toLocaleString("es-PE", {
                     timeZone: "America/Lima",
@@ -98,7 +79,6 @@ export default async function ContractDetailPage({
               </div>
             </dl>
 
-            {/* Menores */}
             {contract.minors && contract.minors.length > 0 && (
               <div className="mt-8">
                 <h3 className="text-xs font-bold text-burgundy uppercase tracking-wider mb-4">
@@ -106,24 +86,12 @@ export default async function ContractDetailPage({
                 </h3>
                 <div className="space-y-3">
                   {contract.minors.map(
-                    (minor: {
-                      id: string;
-                      minor_name: string;
-                      minor_dni: string | null;
-                      minor_age: number;
-                    }) => (
-                      <div
-                        key={minor.id}
-                        className="bg-frost rounded-xl p-4 border border-ice-dark/30"
-                      >
-                        <p className="font-semibold text-dark">
-                          {minor.minor_name}
-                        </p>
+                    (minor: { id: string; minor_name: string; minor_dni: string | null; minor_age: number }) => (
+                      <div key={minor.id} className="bg-frost rounded-xl p-4 border border-ice-dark/30">
+                        <p className="font-semibold text-dark">{minor.minor_name}</p>
                         <p className="text-sm text-dark-soft/60 mt-0.5">
                           {minor.minor_dni && (
-                            <span className="font-mono">
-                              DNI: {minor.minor_dni} &middot;{" "}
-                            </span>
+                            <span className="font-mono">DNI: {minor.minor_dni} &middot; </span>
                           )}
                           Edad: {minor.minor_age} años
                         </p>
@@ -134,7 +102,7 @@ export default async function ContractDetailPage({
               </div>
             )}
 
-            <div className="mt-8 flex flex-wrap gap-3">
+            <div className="mt-8">
               <a
                 href={`/api/pdf/${contract.id}`}
                 target="_blank"
@@ -147,12 +115,10 @@ export default async function ContractDetailPage({
                 </svg>
                 Descargar PDF
               </a>
-              <DeleteContractButton contractId={contract.id} />
             </div>
           </div>
         </div>
 
-        {/* Firma */}
         <div className="bg-white rounded-2xl border border-ice-dark/40 shadow-sm overflow-hidden">
           <div className="h-1.5 bg-gradient-to-r from-ice-dark to-ice" />
           <div className="p-4 md:p-6">
@@ -161,11 +127,7 @@ export default async function ContractDetailPage({
             </h3>
             {signaturePublicUrl ? (
               <div className="border-2 border-ice-dark/40 rounded-xl p-6 bg-white">
-                <img
-                  src={signaturePublicUrl}
-                  alt="Firma del contrato"
-                  className="max-w-full h-auto mx-auto"
-                />
+                <img src={signaturePublicUrl} alt="Firma del contrato" className="max-w-full h-auto mx-auto" />
                 <div className="flex items-center gap-3 mt-4 pt-4 border-t border-ice-dark/30">
                   <div className="flex-1 h-px bg-ice-dark/40" />
                   <span className="text-[10px] text-dark-soft/40 uppercase tracking-wider font-semibold">

@@ -29,7 +29,9 @@ export default function LoginPage() {
       return;
     }
 
-    router.push("/dashboard");
+    const { data: { user: loggedUser } } = await supabase.auth.getUser();
+    const role = loggedUser?.app_metadata?.role;
+    router.push(role === "employee" ? "/caja" : "/dashboard");
     router.refresh();
   };
 
