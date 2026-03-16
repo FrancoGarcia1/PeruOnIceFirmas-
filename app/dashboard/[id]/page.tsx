@@ -85,7 +85,8 @@ export default async function ContractDetailPage({
                   Fecha de firma
                 </dt>
                 <dd className="text-dark mt-0.5">
-                  {new Date(contract.signed_at).toLocaleDateString("es-PE", {
+                  {new Date(contract.signed_at).toLocaleString("es-PE", {
+                    timeZone: "America/Lima",
                     day: "2-digit",
                     month: "2-digit",
                     year: "numeric",

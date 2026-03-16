@@ -45,7 +45,8 @@ export default function ContractTable({
   };
 
   const formatDate = (dateStr: string) =>
-    new Date(dateStr).toLocaleDateString("es-PE", {
+    new Date(dateStr).toLocaleString("es-PE", {
+      timeZone: "America/Lima",
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
