@@ -1,13 +1,9 @@
 export const PERU_TZ = "America/Lima";
 
 export function peruDateStr(daysOffset: number): string {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: PERU_TZ, year: "numeric", month: "2-digit", day: "2-digit", hour12: false,
-  }).formatToParts(new Date());
-  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "0";
-  const base = new Date(`${get("year")}-${get("month")}-${get("day")}T00:00:00-05:00`);
-  base.setDate(base.getDate() + daysOffset);
-  return base.toISOString().split("T")[0];
+  // Suma el offset en ms y formatea directamente en zona Lima — nunca toca UTC
+  const ms = Date.now() + daysOffset * 86_400_000;
+  return new Intl.DateTimeFormat("en-CA", { timeZone: PERU_TZ }).format(ms);
 }
 
 export function toUTCIso(dateStr: string, time: "start" | "end"): string {

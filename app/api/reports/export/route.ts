@@ -142,11 +142,19 @@ async function generatePDF(period: Period, data: Awaited<ReturnType<typeof fetch
   return new Promise((resolve, reject) => {
     const child = spawn("node", [scriptPath], { stdio: ["pipe", "pipe", "pipe"] });
     const chunks: Buffer[] = [];
-    child.stdout.on("data", (c) => chunks.push(c));
-    child.stderr.on("data", (c) => console.error("report-pdf stderr:", c.toString()));
+    const errChunks: Buffer[] = [];
+
+    const timer = setTimeout(() => {
+      child.kill("SIGTERM");
+      reject(new Error("Report PDF generation timed out"));
+    }, 60_000); // reportes pueden tener más datos
+
+    child.stdout.on("data", (c: Buffer) => chunks.push(c));
+    child.stderr.on("data", (c: Buffer) => errChunks.push(c));
     child.on("close", (code) => {
+      clearTimeout(timer);
       if (code === 0) resolve(Buffer.concat(chunks));
-      else reject(new Error(`report-pdf exited with code ${code}`));
+      else reject(new Error(`report-pdf exited ${code}: ${Buffer.concat(errChunks).toString().slice(0, 200)}`));
     });
     child.stdin.write(input);
     child.stdin.end();
@@ -154,6 +162,14 @@ async function generatePDF(period: Period, data: Awaited<ReturnType<typeof fetch
 }
 
 export async function GET(req: NextRequest) {
+  // Verificar autenticación y rol admin
+  const supabaseAuth = await createSupabaseServer();
+  const { data: { user } } = await supabaseAuth.auth.getUser();
+  const role = user?.app_metadata?.role as string | undefined;
+  if (!user || role !== "admin") {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
+
   const url = new URL(req.url);
   const format = url.searchParams.get("format");
   const period = (["daily", "weekly", "monthly"].includes(url.searchParams.get("period") ?? "") ? url.searchParams.get("period") : "daily") as Period;

@@ -5,6 +5,8 @@ import { createSupabaseServer } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
 
+const PDF_TIMEOUT_MS = 30_000;
+
 function runPdfScript(jsonData: string): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const scriptPath = join(process.cwd(), "lib", "generate-pdf.mjs");
@@ -15,10 +17,17 @@ function runPdfScript(jsonData: string): Promise<Buffer> {
     const chunks: Buffer[] = [];
     const errChunks: Buffer[] = [];
 
+    // Timeout para prevenir workers colgados que agotan la memoria del servidor
+    const timer = setTimeout(() => {
+      child.kill("SIGTERM");
+      reject(new Error("PDF generation timed out"));
+    }, PDF_TIMEOUT_MS);
+
     child.stdout.on("data", (chunk: Buffer) => chunks.push(chunk));
     child.stderr.on("data", (chunk: Buffer) => errChunks.push(chunk));
 
     child.on("close", (code) => {
+      clearTimeout(timer);
       if (code !== 0) {
         const errMsg = Buffer.concat(errChunks).toString();
         return reject(new Error(`PDF process exited ${code}: ${errMsg}`));

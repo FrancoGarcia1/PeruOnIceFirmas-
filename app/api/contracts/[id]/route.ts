@@ -24,11 +24,15 @@ export async function DELETE(
     .single();
 
   if (contract?.signature_url) {
+    // Error de storage no es bloqueante: el contrato se elimina igual
     await supabase.storage.from("signatures").remove([contract.signature_url]);
   }
 
-  // Eliminar menores asociados
-  await supabase.from("minors").delete().eq("contract_id", id);
+  // Eliminar menores asociados (verificar error para no dejar huérfanos)
+  const { error: minorsError } = await supabase.from("minors").delete().eq("contract_id", id);
+  if (minorsError) {
+    return NextResponse.json({ error: "Error eliminando menores: " + minorsError.message }, { status: 500 });
+  }
 
   // Eliminar contrato
   const { error } = await supabase.from("contracts").delete().eq("id", id);

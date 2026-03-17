@@ -12,14 +12,19 @@ export default function DeleteContractButton({ contractId }: { contractId: strin
   const handleDelete = async () => {
     setLoading(true);
     setError(null);
-    const res = await fetch(`/api/contracts/${contractId}`, { method: "DELETE" });
-    if (!res.ok) {
-      setError("No se pudo eliminar el contrato. Intente de nuevo.");
+    try {
+      const res = await fetch(`/api/contracts/${contractId}`, { method: "DELETE" });
+      if (!res.ok) {
+        setError("No se pudo eliminar el contrato. Intente de nuevo.");
+        return;
+      }
+      router.push("/dashboard");
+      router.refresh();
+    } catch {
+      setError("Error de conexión. Intente de nuevo.");
+    } finally {
       setLoading(false);
-      return;
     }
-    router.push("/dashboard");
-    router.refresh();
   };
 
   return (

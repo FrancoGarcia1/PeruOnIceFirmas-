@@ -1,6 +1,7 @@
 import { createSupabaseServer } from "@/lib/supabase-server";
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { peruDateStr, toUTCIso } from "@/lib/peru-dates";
 
 export default async function CajaContractDetailPage({
   params,
@@ -10,10 +11,16 @@ export default async function CajaContractDetailPage({
   const { id } = await params;
   const supabase = await createSupabaseServer();
 
+  // Empleados de caja solo pueden ver contratos del día de hoy (zona Lima)
+  const todayStart = toUTCIso(peruDateStr(0), "start");
+  const todayEnd = toUTCIso(peruDateStr(0), "end");
+
   const { data: contract } = await supabase
     .from("contracts")
     .select("*, minors(*)")
     .eq("id", id)
+    .gte("signed_at", todayStart)
+    .lte("signed_at", todayEnd)
     .single();
 
   if (!contract) notFound();
