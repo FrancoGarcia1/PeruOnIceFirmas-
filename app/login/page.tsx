@@ -5,7 +5,10 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { createSupabaseBrowser } from "@/lib/supabase-client";
 
+type RoleView = "admin" | "caja";
+
 export default function LoginPage() {
+  const [roleView, setRoleView] = useState<RoleView>("admin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -35,6 +38,12 @@ export default function LoginPage() {
     router.refresh();
   };
 
+  const handleRoleSwitch = (role: RoleView) => {
+    setRoleView(role);
+    setEmail("");
+    setError(null);
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-frost relative overflow-hidden">
       {/* Background decoration */}
@@ -58,8 +67,70 @@ export default function LoginPage() {
           </div>
           <h1 className="text-2xl font-bold text-dark">Perú on Ice</h1>
           <p className="text-dark-soft/60 text-sm mt-1">
-            Panel de Administración
+            Sistema de Contratos
           </p>
+        </div>
+
+        {/* Role selector */}
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          {/* Admin card */}
+          <button
+            type="button"
+            onClick={() => handleRoleSwitch("admin")}
+            className={`flex flex-col items-center gap-3 p-5 rounded-2xl border-2 transition-all duration-200 ${
+              roleView === "admin"
+                ? "bg-burgundy border-burgundy shadow-xl shadow-burgundy/25 scale-[1.02]"
+                : "bg-white border-ice-dark/40 hover:border-burgundy/30 hover:shadow-md"
+            }`}
+          >
+            <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${
+              roleView === "admin" ? "bg-white/15" : "bg-burgundy/8"
+            }`}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
+                stroke={roleView === "admin" ? "white" : "#B22234"}
+                strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+              </svg>
+            </div>
+            <div className="text-center">
+              <p className={`text-sm font-bold leading-tight ${roleView === "admin" ? "text-white" : "text-dark"}`}>
+                Administrador
+              </p>
+              <p className={`text-[10px] mt-0.5 font-medium ${roleView === "admin" ? "text-white/60" : "text-dark-soft/40"}`}>
+                Acceso completo
+              </p>
+            </div>
+          </button>
+
+          {/* Caja card */}
+          <button
+            type="button"
+            onClick={() => handleRoleSwitch("caja")}
+            className={`flex flex-col items-center gap-3 p-5 rounded-2xl border-2 transition-all duration-200 ${
+              roleView === "caja"
+                ? "bg-burgundy border-burgundy shadow-xl shadow-burgundy/25 scale-[1.02]"
+                : "bg-white border-ice-dark/40 hover:border-burgundy/30 hover:shadow-md"
+            }`}
+          >
+            <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${
+              roleView === "caja" ? "bg-white/15" : "bg-burgundy/8"
+            }`}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
+                stroke={roleView === "caja" ? "white" : "#B22234"}
+                strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="3" width="20" height="14" rx="2" />
+                <path d="M8 21h8M12 17v4" />
+              </svg>
+            </div>
+            <div className="text-center">
+              <p className={`text-sm font-bold leading-tight ${roleView === "caja" ? "text-white" : "text-dark"}`}>
+                Caja
+              </p>
+              <p className={`text-[10px] mt-0.5 font-medium ${roleView === "caja" ? "text-white/60" : "text-dark-soft/40"}`}>
+                Vista de contratos
+              </p>
+            </div>
+          </button>
         </div>
 
         {/* Login card */}
@@ -76,7 +147,11 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full px-4 py-3 border-2 border-ice-dark/40 rounded-xl focus:ring-2 focus:ring-burgundy/20 focus:border-burgundy outline-none transition-all bg-frost text-dark placeholder:text-dark-soft/40"
-                placeholder="admin@peruonice.com"
+                placeholder={
+                  roleView === "admin"
+                    ? "admin@peruonice.com"
+                    : "caja@usuarioperuonice.com"
+                }
                 required
               />
             </div>
@@ -110,29 +185,14 @@ export default function LoginPage() {
             >
               {loading ? (
                 <span className="inline-flex items-center gap-2">
-                  <svg
-                    className="animate-spin h-4 w-4"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                  >
-                    <circle
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="3"
-                      className="opacity-25"
-                    />
-                    <path
-                      d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-                      fill="currentColor"
-                      className="opacity-75"
-                    />
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-25" />
+                    <path d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" fill="currentColor" className="opacity-75" />
                   </svg>
                   Ingresando...
                 </span>
               ) : (
-                "Iniciar sesión"
+                `Ingresar como ${roleView === "admin" ? "Administrador" : "Caja"}`
               )}
             </button>
           </form>
