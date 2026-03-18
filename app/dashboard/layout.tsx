@@ -5,7 +5,6 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { createSupabaseBrowser } from "@/lib/supabase-client";
-import ViewSwitcher from "@/components/ViewSwitcher";
 
 const NAV_ITEMS = [
   {
@@ -86,9 +85,6 @@ export default function DashboardLayout({
           </div>
         </div>
       </div>
-
-      {/* Switcher Admin / Caja */}
-      <ViewSwitcher active="admin" />
 
       {/* Navigation */}
       <nav className="flex-1 p-3 space-y-1 mt-2">
