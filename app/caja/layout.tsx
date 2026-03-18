@@ -1,15 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { createSupabaseBrowser } from "@/lib/supabase-client";
+import ViewSwitcher from "@/components/ViewSwitcher";
 
 export default function CajaLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    createSupabaseBrowser().auth.getUser().then(({ data: { user } }) => {
+      setIsAdmin(user?.app_metadata?.role === "admin");
+    });
+  }, []);
 
   const handleLogout = async () => {
     const supabase = createSupabaseBrowser();
@@ -31,6 +39,9 @@ export default function CajaLayout({ children }: { children: React.ReactNode }) 
           </div>
         </div>
       </div>
+
+      {/* Switcher solo visible para admins que entran a ver la vista caja */}
+      {isAdmin && <ViewSwitcher active="caja" />}
 
       <nav className="flex-1 p-3 space-y-1 mt-2">
         <Link
