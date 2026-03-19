@@ -32,6 +32,7 @@ export default async function CajaPage({
   let query = supabase
     .from("contracts")
     .select("*, minors(*)", { count: "exact" })
+    .is("deleted_at", null)
     .order("signed_at", { ascending: false })
     .range(offset, offset + PAGE_SIZE - 1);
 
@@ -150,6 +151,7 @@ export default async function CajaPage({
           currentPage={page}
           totalPages={totalPages}
           basePath="/caja"
+          extraParams={{ filter }}
         />
       )}
     </div>

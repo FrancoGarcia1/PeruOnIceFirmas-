@@ -27,6 +27,7 @@ interface Props {
   currentPage: number;
   totalPages: number;
   basePath?: string;
+  extraParams?: Record<string, string>;
 }
 
 export default function ContractTable({
@@ -35,15 +36,21 @@ export default function ContractTable({
   currentPage,
   totalPages,
   basePath = "/dashboard",
+  extraParams = {},
 }: Props) {
   const router = useRouter();
   const [query, setQuery] = useState(search);
 
+  const buildParams = (overrides: Record<string, string> = {}) => {
+    const p = new URLSearchParams({ ...extraParams, ...overrides });
+    return p.toString();
+  };
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    const params = new URLSearchParams();
-    if (query) params.set("q", query);
-    router.push(`${basePath}?${params.toString()}`);
+    const params: Record<string, string> = {};
+    if (query) params.q = query;
+    router.push(`${basePath}?${buildParams(params)}`);
   };
 
   const formatDate = (dateStr: string) =>
@@ -268,7 +275,7 @@ export default function ContractTable({
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
             <Link
               key={page}
-              href={`${basePath}?page=${page}${search ? `&q=${search}` : ""}`}
+              href={`${basePath}?${buildParams({ page: String(page), ...(search ? { q: search } : {}) })}`}
               className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${
                 page === currentPage
                   ? "bg-burgundy text-white shadow-md shadow-burgundy/20"
