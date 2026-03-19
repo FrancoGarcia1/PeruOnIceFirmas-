@@ -79,7 +79,7 @@ export default function EmailTable({ emails, currentPage, totalPages, search }: 
                 <tr key={row.id} className="border-b border-ice-dark/20 hover:bg-frost/50 transition-colors">
                   <td className="px-5 py-3.5 text-sm font-semibold text-dark">{row.email}</td>
                   <td className="px-5 py-3.5 text-sm text-dark-soft">{getContract(row)?.adult_name ?? "—"}</td>
-                  <td className="px-5 py-3.5 text-sm text-dark-soft font-mono">{row.contracts?.[0]?.adult_dni ?? "—"}</td>
+                  <td className="px-5 py-3.5 text-sm text-dark-soft font-mono">{getContract(row)?.adult_dni ?? "—"}</td>
                   <td className="px-5 py-3.5 text-sm text-dark-soft/60">
                     {new Date(row.created_at).toLocaleString("es-PE", {
                       timeZone: "America/Lima",
@@ -102,7 +102,7 @@ export default function EmailTable({ emails, currentPage, totalPages, search }: 
           emails.map((row) => (
             <div key={row.id} className="p-4 space-y-1">
               <p className="text-sm font-bold text-dark">{row.email}</p>
-              <p className="text-xs text-dark-soft">{getContract(row)?.adult_name ?? "—"} · {row.contracts?.[0]?.adult_dni ?? "—"}</p>
+              <p className="text-xs text-dark-soft">{getContract(row)?.adult_name ?? "—"} · {getContract(row)?.adult_dni ?? "—"}</p>
               <p className="text-xs text-dark-soft/50">
                 {new Date(row.created_at).toLocaleString("es-PE", {
                   timeZone: "America/Lima",
