@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServer } from "@/lib/supabase-server";
-import { Resend } from "resend";
+import nodemailer from "nodemailer";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-const FROM_EMAIL = process.env.RESEND_FROM_EMAIL ?? "Peru on Ice <onboarding@resend.dev>";
-const BATCH_SIZE = 50;
+const GMAIL_USER = process.env.GMAIL_USER ?? "";
+const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD ?? "";
+const BATCH_SIZE = 10;
+
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: GMAIL_USER,
+    pass: GMAIL_APP_PASSWORD,
+  },
+});
 
 export async function POST(req: NextRequest) {
   const supabase = await createSupabaseServer();
@@ -47,14 +55,20 @@ export async function POST(req: NextRequest) {
   let sent = 0;
   let failed = 0;
 
+  const htmlBody = body
+    .trim()
+    .split("\n")
+    .map((line: string) => `<p style="color: #374151; line-height: 1.6; margin: 0 0 12px;">${line}</p>`)
+    .join("");
+
   // Enviar en batches
   for (let i = 0; i < uniqueEmails.length; i += BATCH_SIZE) {
     const batch = uniqueEmails.slice(i, i + BATCH_SIZE);
 
     const batchPromises = batch.map((email) =>
-      resend.emails
-        .send({
-          from: FROM_EMAIL,
+      transporter
+        .sendMail({
+          from: `Perú on Ice <${GMAIL_USER}>`,
           to: email,
           subject: subject.trim(),
           html: `
@@ -63,7 +77,7 @@ export async function POST(req: NextRequest) {
                 <h2 style="color: #B22234; margin: 0;">Perú on Ice</h2>
               </div>
               <div style="background: #f9fafb; border-radius: 12px; padding: 24px; border: 1px solid #e5e7eb;">
-                ${body.trim().split("\n").map((line: string) => `<p style="color: #374151; line-height: 1.6; margin: 0 0 12px;">${line}</p>`).join("")}
+                ${htmlBody}
               </div>
               <p style="text-align: center; color: #9ca3af; font-size: 12px; margin-top: 32px;">
                 Perú on Ice S.A.C. · Pista de patinaje sobre hielo
