@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServer } from "@/lib/supabase-server";
 import nodemailer from "nodemailer";
+import { generateEmailHtml, type TemplateFields } from "@/lib/email-templates";
 
 const GMAIL_USER = process.env.GMAIL_USER ?? "";
 const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD ?? "";
@@ -23,10 +24,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  const { subject, body } = await req.json();
+  const { subject, body, templateFields } = await req.json();
   if (!subject?.trim() || !body?.trim()) {
     return NextResponse.json({ error: "Asunto y mensaje son obligatorios" }, { status: 400 });
   }
+
+  // Generar HTML con plantilla si viene, sino fallback básico
+  const emailHtml = templateFields
+    ? generateEmailHtml(templateFields as TemplateFields)
+    : `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 32px 24px;">
+        <h2 style="color: #B22234;">Perú on Ice</h2>
+        <div style="background: #f9fafb; border-radius: 12px; padding: 24px; border: 1px solid #e5e7eb;">
+          ${body.trim().split("\n").map((l: string) => `<p style="color: #374151; line-height: 1.6; margin: 0 0 12px;">${l}</p>`).join("")}
+        </div>
+      </div>`;
 
   // Obtener correos únicos
   const { data: emailRows } = await supabase
@@ -55,12 +66,6 @@ export async function POST(req: NextRequest) {
   let sent = 0;
   let failed = 0;
 
-  const htmlBody = body
-    .trim()
-    .split("\n")
-    .map((line: string) => `<p style="color: #374151; line-height: 1.6; margin: 0 0 12px;">${line}</p>`)
-    .join("");
-
   // Enviar en batches
   for (let i = 0; i < uniqueEmails.length; i += BATCH_SIZE) {
     const batch = uniqueEmails.slice(i, i + BATCH_SIZE);
@@ -71,19 +76,7 @@ export async function POST(req: NextRequest) {
           from: `Perú on Ice <${GMAIL_USER}>`,
           to: email,
           subject: subject.trim(),
-          html: `
-            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; padding: 32px 24px;">
-              <div style="text-align: center; margin-bottom: 24px;">
-                <h2 style="color: #B22234; margin: 0;">Perú on Ice</h2>
-              </div>
-              <div style="background: #f9fafb; border-radius: 12px; padding: 24px; border: 1px solid #e5e7eb;">
-                ${htmlBody}
-              </div>
-              <p style="text-align: center; color: #9ca3af; font-size: 12px; margin-top: 32px;">
-                Perú on Ice S.A.C. · Pista de patinaje sobre hielo
-              </p>
-            </div>
-          `,
+          html: emailHtml,
         })
         .then(() => { sent++; })
         .catch(() => { failed++; })
