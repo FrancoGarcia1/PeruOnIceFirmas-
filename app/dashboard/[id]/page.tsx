@@ -161,6 +161,7 @@ export default async function ContractDetailPage({
             </h3>
             {signaturePublicUrl ? (
               <div className="border-2 border-ice-dark/40 rounded-xl p-6 bg-white">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={signaturePublicUrl}
                   alt="Firma del contrato"

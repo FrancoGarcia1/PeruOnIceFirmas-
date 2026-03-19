@@ -1,5 +1,6 @@
 import { createSupabaseServer } from "@/lib/supabase-server";
 import EmailTable from "@/components/EmailTable";
+import Link from "next/link";
 
 const PAGE_SIZE = 20;
 
@@ -62,7 +63,7 @@ export default async function EmailsPage({
             </svg>
             Exportar CSV
           </a>
-          <a
+          <Link
             href="/dashboard/emails/compose"
             className="inline-flex items-center gap-2 px-5 py-2.5 bg-burgundy text-white rounded-xl hover:bg-burgundy-dark transition-all text-sm font-bold shadow-lg shadow-burgundy/20"
           >
@@ -71,7 +72,7 @@ export default async function EmailsPage({
               <polyline points="22,6 12,13 2,6" />
             </svg>
             Enviar correo masivo
-          </a>
+          </Link>
         </div>
       </div>
 

@@ -131,6 +131,7 @@ export default async function PublicContractPage({
                 Firma digital
               </h2>
               <div className="border-2 border-ice-dark/30 rounded-xl p-4 bg-frost">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={signaturePublicUrl}
                   alt="Firma"

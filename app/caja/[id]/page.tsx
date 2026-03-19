@@ -134,6 +134,7 @@ export default async function CajaContractDetailPage({
             </h3>
             {signaturePublicUrl ? (
               <div className="border-2 border-ice-dark/40 rounded-xl p-6 bg-white">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={signaturePublicUrl} alt="Firma del contrato" className="max-w-full h-auto mx-auto" />
                 <div className="flex items-center gap-3 mt-4 pt-4 border-t border-ice-dark/30">
                   <div className="flex-1 h-px bg-ice-dark/40" />
