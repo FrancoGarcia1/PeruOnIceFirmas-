@@ -21,8 +21,7 @@ export async function GET() {
 
   const header = "Email,Nombre,DNI,Fecha de registro";
   const rows = emails.map((row) => {
-    const contracts = row.contracts as { adult_name: string; adult_dni: string }[] | null;
-    const contract = contracts?.[0] ?? null;
+    const contract = row.contracts as unknown as { adult_name: string; adult_dni: string } | null;
     const date = new Date(row.created_at).toLocaleString("es-PE", {
       timeZone: "America/Lima",
       day: "2-digit", month: "2-digit", year: "numeric",
