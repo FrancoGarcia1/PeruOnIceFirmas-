@@ -1,5 +1,5 @@
 import { createSupabaseServer } from "@/lib/supabase-server";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 export async function DELETE(
   _request: Request,
@@ -16,26 +16,39 @@ export async function DELETE(
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
-  // Obtener la URL de la firma para eliminarla del storage
-  const { data: contract } = await supabase
+  // Soft delete: mover a papelera en vez de eliminar permanentemente
+  const { error } = await supabase
     .from("contracts")
-    .select("signature_url")
-    .eq("id", id)
-    .single();
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", id);
 
-  if (contract?.signature_url) {
-    // Error de storage no es bloqueante: el contrato se elimina igual
-    await supabase.storage.from("signatures").remove([contract.signature_url]);
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // Eliminar menores asociados (verificar error para no dejar huérfanos)
-  const { error: minorsError } = await supabase.from("minors").delete().eq("contract_id", id);
-  if (minorsError) {
-    return NextResponse.json({ error: "Error eliminando menores: " + minorsError.message }, { status: 500 });
+  return NextResponse.json({ success: true });
+}
+
+// Restaurar contrato de la papelera
+export async function PATCH(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const supabase = await createSupabaseServer();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user || user.app_metadata?.role !== "admin") {
+    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
 
-  // Eliminar contrato
-  const { error } = await supabase.from("contracts").delete().eq("id", id);
+  const { error } = await supabase
+    .from("contracts")
+    .update({ deleted_at: null })
+    .eq("id", id);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

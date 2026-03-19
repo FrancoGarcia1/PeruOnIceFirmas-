@@ -1,30 +1,24 @@
 import { createSupabaseServer } from "@/lib/supabase-server";
-import ContractTable from "@/components/ContractTable";
-
-interface SearchParams {
-  q?: string;
-  page?: string;
-}
+import TrashTable from "@/components/TrashTable";
 
 const PAGE_SIZE = 20;
 
-export default async function DashboardPage({
+export default async function TrashPage({
   searchParams,
 }: {
-  searchParams: Promise<SearchParams>;
+  searchParams: Promise<{ page?: string; q?: string }>;
 }) {
   const params = await searchParams;
+  const page = Math.max(1, parseInt(params.page ?? "1"));
+  const search = params.q?.trim() ?? "";
   const supabase = await createSupabaseServer();
-  const search = params.q ?? "";
-  const page = parseInt(params.page ?? "1");
-  const offset = (page - 1) * PAGE_SIZE;
 
   let query = supabase
     .from("contracts")
     .select("*, minors(*)", { count: "exact" })
-    .is("deleted_at", null)
-    .order("signed_at", { ascending: false })
-    .range(offset, offset + PAGE_SIZE - 1);
+    .not("deleted_at", "is", null)
+    .order("deleted_at", { ascending: false })
+    .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
 
   if (search) {
     query = query.or(
@@ -38,14 +32,13 @@ export default async function DashboardPage({
   return (
     <div>
       <div className="mb-8">
-        <h2 className="text-xl md:text-2xl font-bold text-dark">Contratos</h2>
+        <h2 className="text-xl md:text-2xl font-bold text-dark">Papelera</h2>
         <p className="text-dark-soft/60 mt-1 text-sm">
-          {count ?? 0} contrato{count !== 1 ? "s" : ""} registrado
-          {count !== 1 ? "s" : ""}
+          {count ?? 0} contrato{(count ?? 0) !== 1 ? "s" : ""} en papelera
         </p>
       </div>
 
-      <ContractTable
+      <TrashTable
         contracts={contracts ?? []}
         search={search}
         currentPage={page}

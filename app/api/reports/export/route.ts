@@ -42,7 +42,19 @@ async function fetchReportData(period: Period) {
 
   const dateFormatted = new Date().toLocaleDateString("es-PE", { timeZone: PERU_TZ, weekday: "long", year: "numeric", month: "long", day: "numeric" });
 
-  return { items, minors, soloAdultCount, withMinorsCount, avgAge, ageRanges, timeBreakdown, prevCount: prevCount ?? 0, dateFormatted, totalPeople: items.length + minors.length };
+  // Desglose por hora (12 PM a 11 PM) — siempre calculado, independiente del periodo
+  const hourlyCounts: Record<number, number> = {};
+  for (let h = 12; h <= 23; h++) hourlyCounts[h] = 0;
+  items.forEach((c) => {
+    const h = toPeruHour(c.signed_at);
+    if (h >= 12 && h <= 23) hourlyCounts[h]++;
+  });
+  const hourlyBreakdown = Object.entries(hourlyCounts).map(([h, n]) => ({
+    label: `${h.padStart(2, "0")}:00`,
+    count: n,
+  }));
+
+  return { items, minors, soloAdultCount, withMinorsCount, avgAge, ageRanges, timeBreakdown, hourlyBreakdown, prevCount: prevCount ?? 0, dateFormatted, totalPeople: items.length + minors.length };
 }
 
 function generateExcel(period: Period, data: Awaited<ReturnType<typeof fetchReportData>>): Buffer {
@@ -77,6 +89,14 @@ function generateExcel(period: Period, data: Awaited<ReturnType<typeof fetchRepo
   const wsDetalle = XLSX.utils.aoa_to_sheet(timeRows);
   wsDetalle["!cols"] = [{ wch: 15 }, { wch: 12 }, { wch: 12 }];
   XLSX.utils.book_append_sheet(wb, wsDetalle, period === "daily" ? "Por Hora" : "Por Día");
+
+  // Sheet: Por Hora (12 PM - 11 PM) — se agrega siempre en semanal/mensual, ya existe en diario
+  if (period !== "daily") {
+    const hourlyRows = [["Hora", "Contratos", "% del total"], ...data.hourlyBreakdown.map((t) => [t.label, t.count, data.items.length > 0 ? `${Math.round((t.count / data.items.length) * 100)}%` : "0%"])];
+    const wsHourly = XLSX.utils.aoa_to_sheet(hourlyRows);
+    wsHourly["!cols"] = [{ wch: 15 }, { wch: 12 }, { wch: 12 }];
+    XLSX.utils.book_append_sheet(wb, wsHourly, "Por Hora");
+  }
 
   // Sheet 3: Demografía
   const demoRows = [["Rango de edad", "Cantidad", "% del total"], ...data.ageRanges.map((a) => {
