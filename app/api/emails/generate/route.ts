@@ -12,45 +12,45 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  const { template, title, context } = await req.json();
+  const { idea } = await req.json();
 
-  if (!template || !title?.trim()) {
-    return NextResponse.json({ error: "Plantilla y título son obligatorios" }, { status: 400 });
+  if (!idea?.trim()) {
+    return NextResponse.json({ error: "Describe tu idea" }, { status: 400 });
   }
 
-  const templateDescriptions: Record<string, string> = {
-    promocion: "una promoción o descuento para atraer clientes a la pista de patinaje",
-    evento: "un evento especial o fecha importante en la pista de patinaje",
-    informativo: "un aviso informativo o noticia sobre la pista de patinaje",
-    especial: "una celebración, temporada festiva o ocasión especial en la pista de patinaje",
-  };
+  const prompt = `Eres un experto en email marketing especializado en negocios de entretenimiento familiar. Trabajas para "Perú on Ice", una pista de patinaje sobre hielo en Perú.
 
-  const prompt = `Eres un experto en email marketing para negocios de entretenimiento familiar. Escribe el cuerpo de un correo electrónico para "Perú on Ice", una pista de patinaje sobre hielo en Perú.
+El administrador quiere enviar un correo masivo a sus clientes. Solo te ha dado esta idea:
 
-REGLAS:
-- Escribe SOLO el cuerpo del mensaje (sin asunto, sin saludo tipo "Estimado cliente")
-- Máximo 4-5 párrafos cortos
-- Tono cercano, entusiasta pero profesional
-- Incluye un sentido de urgencia o exclusividad
-- Usa emojis con moderación (1-2 máximo)
-- Enfócate en la experiencia y la emoción, no solo en el precio
-- Escribe en español peruano natural
-- NO incluyas links ni URLs
-- NO incluyas "Atentamente" ni firma al final
+"${idea.trim()}"
 
-TIPO DE CORREO: ${templateDescriptions[template] ?? "comunicación general"}
-TÍTULO/ASUNTO: ${title}
-${context ? `CONTEXTO ADICIONAL: ${context}` : ""}
+Tu trabajo es crear un correo COMPLETO que convierta. Debes generar TODOS estos campos:
 
-Escribe el mensaje ahora:`;
+1. **template**: Elige la mejor plantilla entre: "promocion" (descuentos, ofertas), "evento" (fechas especiales, shows), "informativo" (noticias, horarios), "especial" (celebraciones, temporadas)
+2. **title**: Un asunto de email irresistible, máximo 60 caracteres. Debe generar curiosidad o urgencia.
+3. **badge**: Una etiqueta corta y llamativa (ej: "50% OFF", "2x1", "GRATIS", "⭐ VIP", "🎄"). Si no aplica, déjalo vacío.
+4. **body**: El cuerpo del correo. 3-5 párrafos cortos. Tono cercano, entusiasta, persuasivo. Español peruano natural. Incluye: gancho emocional, beneficio claro, sentido de urgencia. NO incluyas links, saludos formales, ni firma.
+5. **ctaText**: Texto del botón de acción (ej: "Reservar ahora", "Quiero ir", "Ver horarios"). Corto y con verbo de acción.
+
+RESPONDE SOLO CON UN JSON VÁLIDO, sin markdown, sin backticks, sin explicación. Ejemplo:
+{"template":"promocion","title":"2x1 en entradas este fin de semana","badge":"2x1","body":"Párrafo 1\\n\\nPárrafo 2\\n\\nPárrafo 3","ctaText":"Reservar ahora"}`;
 
   try {
     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
     const result = await model.generateContent(prompt);
-    const text = result.response.text();
+    const text = result.response.text().trim();
 
-    return NextResponse.json({ message: text.trim() });
+    // Limpiar posibles backticks de markdown
+    const cleaned = text.replace(/^```json\s*/i, "").replace(/```\s*$/i, "").trim();
+    const parsed = JSON.parse(cleaned);
+
+    // Validar campos mínimos
+    if (!parsed.template || !parsed.title || !parsed.body) {
+      return NextResponse.json({ error: "La IA no generó un resultado válido. Intenta de nuevo." }, { status: 500 });
+    }
+
+    return NextResponse.json(parsed);
   } catch {
-    return NextResponse.json({ error: "Error generando el mensaje" }, { status: 500 });
+    return NextResponse.json({ error: "Error generando el correo. Intenta de nuevo." }, { status: 500 });
   }
 }

@@ -6,53 +6,78 @@ import Link from "next/link";
 import { TEMPLATES, generateEmailHtml, type TemplateName, type TemplateFields } from "@/lib/email-templates";
 
 export default function ComposeEmailPage() {
+  // AI generation
+  const [idea, setIdea] = useState("");
+  const [generating, setGenerating] = useState(false);
+
+  // Email fields (filled by AI or manually)
   const [template, setTemplate] = useState<TemplateName | null>(null);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [badge, setBadge] = useState("");
   const [ctaText, setCtaText] = useState("");
-  const [ctaUrl, setCtaUrl] = useState("");
+  const [ctaUrl, setCtaUrl] = useState("https://peruonice.com");
   const [eventDate, setEventDate] = useState("");
   const [eventLocation, setEventLocation] = useState("");
+
+  // Send state
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<{ sent: number; failed: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
-  const [generating, setGenerating] = useState(false);
-  const [aiContext, setAiContext] = useState("");
   const router = useRouter();
+
+  const generated = template !== null && title.length > 0 && body.length > 0;
 
   const fields: TemplateFields = {
     template: template ?? "informativo",
     title: title || "Tu título aquí",
     body: body || "Tu mensaje aquí...",
-    badge,
-    ctaText,
-    ctaUrl,
-    eventDate,
-    eventLocation,
+    badge, ctaText, ctaUrl, eventDate, eventLocation,
   };
 
-  const previewHtml = template ? generateEmailHtml(fields) : "";
+  const previewHtml = generated ? generateEmailHtml(fields) : "";
+
+  const handleGenerate = async () => {
+    if (!idea.trim()) return;
+    setGenerating(true);
+    setError(null);
+
+    try {
+      const res = await fetch("/api/emails/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idea }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error); return; }
+
+      setTemplate(data.template as TemplateName);
+      setTitle(data.title ?? "");
+      setBody(data.body ?? "");
+      setBadge(data.badge ?? "");
+      setCtaText(data.ctaText ?? "");
+      if (data.eventDate) setEventDate(data.eventDate);
+      if (data.eventLocation) setEventLocation(data.eventLocation);
+    } catch {
+      setError("Error de conexión con IA");
+    } finally {
+      setGenerating(false);
+    }
+  };
 
   const handleSend = async () => {
     setShowConfirm(false);
     setSending(true);
     setError(null);
     setResult(null);
-
     try {
       const res = await fetch("/api/emails/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          subject: title,
-          body,
-          templateFields: fields,
-        }),
+        body: JSON.stringify({ subject: title, body, templateFields: fields }),
       });
-
       const data = await res.json();
       if (!res.ok) { setError(data.error || "Error al enviar"); return; }
       setResult({ sent: data.sent, failed: data.failed });
@@ -63,7 +88,11 @@ export default function ComposeEmailPage() {
     }
   };
 
-  const canSend = template && title.trim().length > 0 && body.trim().length > 0;
+  const handleReset = () => {
+    setTemplate(null); setTitle(""); setBody(""); setBadge("");
+    setCtaText(""); setCtaUrl("https://peruonice.com");
+    setEventDate(""); setEventLocation(""); setIdea("");
+  };
 
   if (result) {
     return (
@@ -92,185 +121,130 @@ export default function ComposeEmailPage() {
     <div>
       <Header />
 
-      {/* Step 1: Elegir plantilla */}
-      {!template ? (
-        <div>
-          <p className="text-sm text-dark-soft/60 mb-5">Elige una plantilla para tu correo:</p>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            {(Object.entries(TEMPLATES) as [TemplateName, typeof TEMPLATES[TemplateName]][]).map(([key, t]) => (
-              <button
-                key={key}
-                onClick={() => setTemplate(key)}
-                className="group bg-white rounded-2xl border-2 border-ice-dark/40 hover:border-burgundy/50 p-5 text-center transition-all hover:shadow-lg hover:shadow-burgundy/10 hover:scale-[1.02]"
-              >
-                <div className="text-3xl mb-3">{t.icon}</div>
-                <p className="text-sm font-bold text-dark mb-1">{t.label}</p>
-                <p className="text-[11px] text-dark-soft/50">{t.description}</p>
-              </button>
-            ))}
+      {!generated ? (
+        /* ───── PASO 1: Describe tu idea ───── */
+        <div className="max-w-xl mx-auto">
+          <div className="bg-gradient-to-br from-violet-50 via-fuchsia-50 to-pink-50 border border-violet-200/60 rounded-2xl p-6 md:p-8 space-y-5">
+            <div className="text-center space-y-2">
+              <div className="text-4xl">✨</div>
+              <h3 className="text-lg font-bold text-dark">Crea tu correo con IA</h3>
+              <p className="text-sm text-dark-soft/60">
+                Solo describe tu idea y la IA creará un correo completo listo para enviar
+              </p>
+            </div>
+
+            <textarea
+              value={idea}
+              onChange={(e) => setIdea(e.target.value)}
+              placeholder="Ej: Quiero hacer un 2x1 en entradas este fin de semana para familias con niños, y que sepan que tenemos música en vivo el sábado..."
+              rows={4}
+              className="w-full px-4 py-3 border-2 border-violet-200 rounded-xl focus:ring-2 focus:ring-violet-300 focus:border-violet-400 outline-none transition-all bg-white text-dark placeholder:text-dark-soft/35 text-sm resize-none"
+            />
+
+            {error && (
+              <p className="text-xs text-red-500 font-medium text-center">{error}</p>
+            )}
+
+            <button
+              onClick={handleGenerate}
+              disabled={generating || !idea.trim()}
+              className="w-full py-4 bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white font-bold rounded-xl hover:from-violet-700 hover:to-fuchsia-700 transition-all disabled:opacity-50 shadow-lg shadow-violet-500/25 text-sm flex items-center justify-center gap-2"
+            >
+              {generating ? (
+                <>
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-25" />
+                    <path d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" fill="currentColor" className="opacity-75" />
+                  </svg>
+                  La IA está creando tu correo...
+                </>
+              ) : "✨ Crear correo con IA"}
+            </button>
+
+            <p className="text-[10px] text-center text-dark-soft/30">
+              Puedes editar todo después de generar
+            </p>
           </div>
         </div>
       ) : (
+        /* ───── PASO 2: Editar y enviar ───── */
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-          {/* Left: Form */}
+          {/* Left: Editable fields */}
           <div className="space-y-4">
-            {/* Template badge */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="text-lg">{TEMPLATES[template].icon}</span>
                 <span className="text-sm font-bold text-dark">{TEMPLATES[template].label}</span>
+                <span className="text-[10px] bg-violet-100 text-violet-600 px-2 py-0.5 rounded-full font-bold">Generado con IA</span>
               </div>
-              <button
-                onClick={() => { setTemplate(null); setTitle(""); setBody(""); setBadge(""); setCtaText(""); setCtaUrl(""); setEventDate(""); setEventLocation(""); }}
-                className="text-xs text-burgundy font-bold hover:text-burgundy-dark transition-colors"
-              >
-                Cambiar plantilla
+              <button onClick={handleReset} className="text-xs text-burgundy font-bold hover:text-burgundy-dark transition-colors">
+                Nueva idea
               </button>
             </div>
 
             <div className="bg-white rounded-2xl border border-ice-dark/40 shadow-sm p-5 space-y-4">
-              {/* Badge (Promoción y Especial) */}
-              {(template === "promocion" || template === "especial") && (
+              {/* Badge */}
+              {(template === "promocion" || template === "especial") && badge && (
                 <div>
-                  <label className="block text-[10px] font-bold text-dark-soft/50 uppercase tracking-wider mb-1.5">
-                    {template === "promocion" ? "Etiqueta de oferta" : "Emoji o etiqueta"}
-                  </label>
-                  <input
-                    type="text"
-                    value={badge}
-                    onChange={(e) => setBadge(e.target.value)}
-                    placeholder={template === "promocion" ? "Ej: 50% OFF" : "Ej: 🎄 o 🎂"}
-                    className="w-full px-4 py-2.5 border-2 border-ice-dark/40 rounded-xl focus:ring-2 focus:ring-burgundy/20 focus:border-burgundy outline-none transition-all bg-frost text-dark placeholder:text-dark-soft/40 text-sm"
-                  />
+                  <label className="block text-[10px] font-bold text-dark-soft/50 uppercase tracking-wider mb-1.5">Etiqueta</label>
+                  <input type="text" value={badge} onChange={(e) => setBadge(e.target.value)}
+                    className="w-full px-4 py-2.5 border-2 border-ice-dark/40 rounded-xl focus:ring-2 focus:ring-burgundy/20 focus:border-burgundy outline-none transition-all bg-frost text-dark text-sm" />
                 </div>
               )}
 
               {/* Título */}
               <div>
-                <label className="block text-[10px] font-bold text-dark-soft/50 uppercase tracking-wider mb-1.5">
-                  Título / Asunto
-                </label>
-                <input
-                  type="text"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Ej: Ven a disfrutar del hielo"
-                  className="w-full px-4 py-2.5 border-2 border-ice-dark/40 rounded-xl focus:ring-2 focus:ring-burgundy/20 focus:border-burgundy outline-none transition-all bg-frost text-dark placeholder:text-dark-soft/40 text-sm"
-                />
+                <label className="block text-[10px] font-bold text-dark-soft/50 uppercase tracking-wider mb-1.5">Asunto del correo</label>
+                <input type="text" value={title} onChange={(e) => setTitle(e.target.value)}
+                  className="w-full px-4 py-2.5 border-2 border-ice-dark/40 rounded-xl focus:ring-2 focus:ring-burgundy/20 focus:border-burgundy outline-none transition-all bg-frost text-dark text-sm" />
               </div>
 
-              {/* Evento: fecha y lugar */}
+              {/* Evento fields */}
               {template === "evento" && (
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-[10px] font-bold text-dark-soft/50 uppercase tracking-wider mb-1.5">Fecha</label>
-                    <input
-                      type="text"
-                      value={eventDate}
-                      onChange={(e) => setEventDate(e.target.value)}
-                      placeholder="Ej: Sábado 22 de Marzo"
-                      className="w-full px-4 py-2.5 border-2 border-ice-dark/40 rounded-xl focus:ring-2 focus:ring-burgundy/20 focus:border-burgundy outline-none transition-all bg-frost text-dark placeholder:text-dark-soft/40 text-sm"
-                    />
+                    <input type="text" value={eventDate} onChange={(e) => setEventDate(e.target.value)} placeholder="Ej: Sábado 22"
+                      className="w-full px-4 py-2.5 border-2 border-ice-dark/40 rounded-xl focus:ring-2 focus:ring-burgundy/20 focus:border-burgundy outline-none transition-all bg-frost text-dark text-sm" />
                   </div>
                   <div>
                     <label className="block text-[10px] font-bold text-dark-soft/50 uppercase tracking-wider mb-1.5">Lugar</label>
-                    <input
-                      type="text"
-                      value={eventLocation}
-                      onChange={(e) => setEventLocation(e.target.value)}
-                      placeholder="Ej: Mall Aventura"
-                      className="w-full px-4 py-2.5 border-2 border-ice-dark/40 rounded-xl focus:ring-2 focus:ring-burgundy/20 focus:border-burgundy outline-none transition-all bg-frost text-dark placeholder:text-dark-soft/40 text-sm"
-                    />
+                    <input type="text" value={eventLocation} onChange={(e) => setEventLocation(e.target.value)} placeholder="Ej: Mall Aventura"
+                      className="w-full px-4 py-2.5 border-2 border-ice-dark/40 rounded-xl focus:ring-2 focus:ring-burgundy/20 focus:border-burgundy outline-none transition-all bg-frost text-dark text-sm" />
                   </div>
                 </div>
               )}
 
-              {/* Generador IA */}
-              <div className="bg-gradient-to-r from-violet-50 to-fuchsia-50 border border-violet-200/60 rounded-xl p-4 space-y-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm">✨</span>
-                  <p className="text-xs font-bold text-violet-700">Generar mensaje con IA</p>
-                </div>
-                <input
-                  type="text"
-                  value={aiContext}
-                  onChange={(e) => setAiContext(e.target.value)}
-                  placeholder="Contexto extra (opcional): Ej: 2x1 en entrada, válido solo este fin de semana"
-                  className="w-full px-3 py-2 border border-violet-200 rounded-lg focus:ring-2 focus:ring-violet-300 focus:border-violet-400 outline-none transition-all bg-white text-dark placeholder:text-dark-soft/40 text-xs"
-                />
-                <button
-                  type="button"
-                  onClick={async () => {
-                    if (!title.trim()) { setError("Escribe un título primero"); return; }
-                    setGenerating(true);
-                    setError(null);
-                    try {
-                      const res = await fetch("/api/emails/generate", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ template, title, context: aiContext }),
-                      });
-                      const data = await res.json();
-                      if (!res.ok) { setError(data.error); return; }
-                      setBody(data.message);
-                    } catch { setError("Error de conexión con IA"); }
-                    finally { setGenerating(false); }
-                  }}
-                  disabled={generating || !title.trim()}
-                  className="w-full py-2.5 bg-violet-600 text-white rounded-lg text-xs font-bold hover:bg-violet-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {generating ? (
-                    <>
-                      <svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none">
-                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-25" />
-                        <path d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" fill="currentColor" className="opacity-75" />
-                      </svg>
-                      Generando...
-                    </>
-                  ) : "✨ Generar mensaje"}
-                </button>
-              </div>
-
               {/* Mensaje */}
               <div>
                 <label className="block text-[10px] font-bold text-dark-soft/50 uppercase tracking-wider mb-1.5">Mensaje</label>
-                <textarea
-                  value={body}
-                  onChange={(e) => setBody(e.target.value)}
-                  placeholder="Escribe el contenido o genera uno con IA..."
-                  rows={5}
-                  className="w-full px-4 py-2.5 border-2 border-ice-dark/40 rounded-xl focus:ring-2 focus:ring-burgundy/20 focus:border-burgundy outline-none transition-all bg-frost text-dark placeholder:text-dark-soft/40 text-sm resize-none"
-                />
+                <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={6}
+                  className="w-full px-4 py-2.5 border-2 border-ice-dark/40 rounded-xl focus:ring-2 focus:ring-burgundy/20 focus:border-burgundy outline-none transition-all bg-frost text-dark text-sm resize-none" />
               </div>
 
               {/* CTA */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[10px] font-bold text-dark-soft/50 uppercase tracking-wider mb-1.5">
-                    Botón (opcional)
-                  </label>
-                  <input
-                    type="text"
-                    value={ctaText}
-                    onChange={(e) => setCtaText(e.target.value)}
-                    placeholder="Ej: Reservar ahora"
-                    className="w-full px-4 py-2.5 border-2 border-ice-dark/40 rounded-xl focus:ring-2 focus:ring-burgundy/20 focus:border-burgundy outline-none transition-all bg-frost text-dark placeholder:text-dark-soft/40 text-sm"
-                  />
+                  <label className="block text-[10px] font-bold text-dark-soft/50 uppercase tracking-wider mb-1.5">Botón</label>
+                  <input type="text" value={ctaText} onChange={(e) => setCtaText(e.target.value)} placeholder="Ej: Reservar ahora"
+                    className="w-full px-4 py-2.5 border-2 border-ice-dark/40 rounded-xl focus:ring-2 focus:ring-burgundy/20 focus:border-burgundy outline-none transition-all bg-frost text-dark text-sm" />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-dark-soft/50 uppercase tracking-wider mb-1.5">
-                    Link del botón
-                  </label>
-                  <input
-                    type="url"
-                    value={ctaUrl}
-                    onChange={(e) => setCtaUrl(e.target.value)}
-                    placeholder="https://peruonice.com"
-                    className="w-full px-4 py-2.5 border-2 border-ice-dark/40 rounded-xl focus:ring-2 focus:ring-burgundy/20 focus:border-burgundy outline-none transition-all bg-frost text-dark placeholder:text-dark-soft/40 text-sm"
-                  />
+                  <label className="block text-[10px] font-bold text-dark-soft/50 uppercase tracking-wider mb-1.5">Link del botón</label>
+                  <input type="url" value={ctaUrl} onChange={(e) => setCtaUrl(e.target.value)}
+                    className="w-full px-4 py-2.5 border-2 border-ice-dark/40 rounded-xl focus:ring-2 focus:ring-burgundy/20 focus:border-burgundy outline-none transition-all bg-frost text-dark text-sm" />
                 </div>
               </div>
             </div>
+
+            {/* Regenerar */}
+            <button
+              onClick={handleGenerate}
+              disabled={generating || !idea.trim()}
+              className="w-full py-2.5 border-2 border-violet-300 text-violet-600 font-bold rounded-xl text-xs hover:bg-violet-50 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {generating ? "Regenerando..." : "✨ Regenerar con IA"}
+            </button>
 
             {error && (
               <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3">
@@ -279,44 +253,34 @@ export default function ComposeEmailPage() {
             )}
 
             <div className="flex gap-3">
-              {/* Preview mobile */}
-              <button
-                onClick={() => setShowPreview(true)}
-                className="xl:hidden flex-1 py-3.5 border-2 border-burgundy text-burgundy font-bold rounded-2xl text-sm hover:bg-burgundy/5 transition-all"
-              >
+              <button onClick={() => setShowPreview(true)}
+                className="xl:hidden flex-1 py-3.5 border-2 border-burgundy text-burgundy font-bold rounded-2xl text-sm hover:bg-burgundy/5 transition-all">
                 Vista previa
               </button>
-              <button
-                onClick={() => setShowConfirm(true)}
-                disabled={!canSend || sending}
-                className="flex-1 py-3.5 bg-burgundy text-white font-bold rounded-2xl hover:bg-burgundy-dark transition-all disabled:opacity-50 shadow-lg shadow-burgundy/20 text-sm"
-              >
+              <button onClick={() => setShowConfirm(true)} disabled={!generated || sending}
+                className="flex-1 py-3.5 bg-burgundy text-white font-bold rounded-2xl hover:bg-burgundy-dark transition-all disabled:opacity-50 shadow-lg shadow-burgundy/20 text-sm">
                 {sending ? "Enviando..." : "Enviar a todos"}
               </button>
             </div>
           </div>
 
-          {/* Right: Live Preview (desktop) */}
+          {/* Right: Live Preview */}
           <div className="hidden xl:block">
             <p className="text-[10px] font-bold text-dark-soft/40 uppercase tracking-wider mb-3">Vista previa del correo</p>
             <div className="bg-gray-100 rounded-2xl p-4 border border-ice-dark/40 overflow-hidden">
               <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-                {/* Fake email header */}
                 <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-3">
                   <div className="w-8 h-8 rounded-full bg-burgundy/10 flex items-center justify-center">
                     <span className="text-burgundy text-xs font-bold">PI</span>
                   </div>
                   <div>
                     <p className="text-xs font-semibold text-dark">Perú on Ice</p>
-                    <p className="text-[10px] text-dark-soft/40">{title || "Asunto del correo"}</p>
+                    <p className="text-[10px] text-dark-soft/40">{title}</p>
                   </div>
                 </div>
-                {/* Email content */}
-                <div
-                  className="[&_*]:!max-w-full overflow-auto max-h-[600px]"
+                <div className="[&_*]:!max-w-full overflow-auto max-h-[600px]"
                   style={{ transform: "scale(0.85)", transformOrigin: "top left", width: "117.6%" }}
-                  dangerouslySetInnerHTML={{ __html: previewHtml }}
-                />
+                  dangerouslySetInnerHTML={{ __html: previewHtml }} />
               </div>
             </div>
           </div>
