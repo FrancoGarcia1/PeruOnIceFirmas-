@@ -36,7 +36,7 @@ RESPONDE SOLO CON UN JSON VÁLIDO, sin markdown, sin backticks, sin explicación
 {"template":"promocion","title":"2x1 en entradas este fin de semana","badge":"2x1","body":"Párrafo 1\\n\\nPárrafo 2\\n\\nPárrafo 3","ctaText":"Reservar ahora"}`;
 
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-3.1-pro-preview" });
     const result = await model.generateContent(prompt);
     const text = result.response.text().trim();
 
