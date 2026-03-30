@@ -107,17 +107,39 @@ function generateExcel(period: Period, data: Awaited<ReturnType<typeof fetchRepo
   wsDemo["!cols"] = [{ wch: 15 }, { wch: 12 }, { wch: 12 }];
   XLSX.utils.book_append_sheet(wb, wsDemo, "Demografía");
 
-  // Sheet 4: Lista de contratos
+  // Sheet 4: Lista de contratos con menores en columnas separadas
+  // Calcular máximo de menores por contrato para saber cuántas columnas crear
+  const minorCounts = data.items.map((c) => data.minors.filter((m) => m.contract_id === c.id).length);
+  const maxMinors = Math.max(0, ...minorCounts);
+
+  // Headers: datos del adulto + por cada menor: Nombre, DNI, Edad
+  const contractHeader = ["Nombre", "DNI", "Edad", "Fecha y hora (Lima)"];
+  for (let i = 1; i <= maxMinors; i++) {
+    contractHeader.push(`Menor ${i} - Nombre`, `Menor ${i} - DNI`, `Menor ${i} - Edad`);
+  }
+
   const contractRows = [
-    ["Nombre", "DNI", "Edad", "Fecha y hora (Lima)", "Menores asociados"],
+    contractHeader,
     ...data.items.map((c) => {
       const fecha = new Date(c.signed_at).toLocaleString("es-PE", { timeZone: PERU_TZ });
-      const menores = data.minors.filter((m) => m.contract_id === c.id).map((m) => `${m.minor_name} - DNI: ${m.minor_dni ?? "—"} (${m.minor_age} años)`).join(", ");
-      return [c.adult_name, c.adult_dni, c.adult_age ?? "—", fecha, menores || "Ninguno"];
+      const row: (string | number)[] = [c.adult_name, c.adult_dni, c.adult_age ?? "—", fecha];
+      const menores = data.minors.filter((m) => m.contract_id === c.id);
+      for (let i = 0; i < maxMinors; i++) {
+        if (menores[i]) {
+          row.push(menores[i].minor_name, menores[i].minor_dni ?? "—", menores[i].minor_age);
+        } else {
+          row.push("", "", "");
+        }
+      }
+      return row;
     }),
   ];
   const wsContratos = XLSX.utils.aoa_to_sheet(contractRows);
-  wsContratos["!cols"] = [{ wch: 35 }, { wch: 12 }, { wch: 8 }, { wch: 22 }, { wch: 40 }];
+  const contractCols = [{ wch: 35 }, { wch: 12 }, { wch: 8 }, { wch: 22 }];
+  for (let i = 0; i < maxMinors; i++) {
+    contractCols.push({ wch: 30 }, { wch: 12 }, { wch: 8 });
+  }
+  wsContratos["!cols"] = contractCols;
   XLSX.utils.book_append_sheet(wb, wsContratos, "Contratos");
 
   // Sheet 5: Menores
