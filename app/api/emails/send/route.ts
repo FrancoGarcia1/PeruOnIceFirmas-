@@ -15,22 +15,70 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+// Extraer primer nombre de "APELLIDO APELLIDO, NOMBRE SEGUNDO" → "Nombre"
+function extractFirstName(fullName: string): string {
+  const parts = fullName.split(",");
+  const firstName = (parts[1] ?? parts[0] ?? "").trim().split(" ")[0] ?? "";
+  return firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase();
+}
+
 export async function POST(req: NextRequest) {
   const supabase = await createSupabaseServer();
 
-  // Verificar admin
   const { data: { user } } = await supabase.auth.getUser();
   if (!user || user.app_metadata?.role !== "admin") {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  const { subject, body, templateFields } = await req.json();
+  const { subject, body, templateFields, selectedIds } = await req.json();
   if (!subject?.trim() || !body?.trim()) {
     return NextResponse.json({ error: "Asunto y mensaje son obligatorios" }, { status: 400 });
   }
 
-  // Generar HTML con plantilla si viene, sino fallback básico
-  const emailHtml = templateFields
+  // Obtener destinatarios: seleccionados o todos
+  let query = supabase
+    .from("contract_emails")
+    .select("id, email, contract_id, manual_name, contracts(adult_name)");
+
+  if (selectedIds && Array.isArray(selectedIds) && selectedIds.length > 0) {
+    query = query.in("id", selectedIds);
+  }
+
+  const { data: emailRows } = await query;
+
+  if (!emailRows || emailRows.length === 0) {
+    return NextResponse.json({ error: "No hay correos para enviar" }, { status: 400 });
+  }
+
+  // Deduplicar por email y extraer nombre
+  const recipientMap = new Map<string, string>();
+  for (const row of emailRows) {
+    if (recipientMap.has(row.email)) continue;
+    const contract = row.contracts as unknown as { adult_name: string } | null;
+    const name = row.manual_name ?? contract?.adult_name ?? "";
+    recipientMap.set(row.email, name);
+  }
+
+  const recipients = Array.from(recipientMap.entries()).map(([email, name]) => ({
+    email,
+    firstName: name ? extractFirstName(name) : "",
+  }));
+
+  // Crear registro de campaña
+  const { data: campaign } = await supabase
+    .from("email_campaigns")
+    .insert({
+      subject: subject.trim(),
+      body: body.trim(),
+      total_recipients: recipients.length,
+      status: "sending",
+      created_by: user.id,
+    })
+    .select("id")
+    .single();
+
+  // Generar HTML base
+  const baseHtml = templateFields
     ? generateEmailHtml(templateFields as TemplateFields)
     : `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 32px 24px;">
         <h2 style="color: #B22234;">Perú on Ice</h2>
@@ -39,63 +87,42 @@ export async function POST(req: NextRequest) {
         </div>
       </div>`;
 
-  // Obtener correos únicos
-  const { data: emailRows } = await supabase
-    .from("contract_emails")
-    .select("email");
-
-  if (!emailRows || emailRows.length === 0) {
-    return NextResponse.json({ error: "No hay correos para enviar" }, { status: 400 });
-  }
-
-  const uniqueEmails = [...new Set(emailRows.map((r) => r.email))];
-
-  // Crear registro de campaña
-  const { data: campaign } = await supabase
-    .from("email_campaigns")
-    .insert({
-      subject: subject.trim(),
-      body: body.trim(),
-      total_recipients: uniqueEmails.length,
-      status: "sending",
-      created_by: user.id,
-    })
-    .select("id")
-    .single();
-
   let sent = 0;
   let failed = 0;
 
-  // Enviar en batches
-  for (let i = 0; i < uniqueEmails.length; i += BATCH_SIZE) {
-    const batch = uniqueEmails.slice(i, i + BATCH_SIZE);
+  // Enviar en batches con personalización
+  for (let i = 0; i < recipients.length; i += BATCH_SIZE) {
+    const batch = recipients.slice(i, i + BATCH_SIZE);
 
-    const batchPromises = batch.map((email) =>
-      transporter
+    const batchPromises = batch.map(({ email, firstName }) => {
+      // Reemplazar {{nombre}} con el primer nombre del destinatario
+      const personalizedHtml = baseHtml.replace(/\{\{nombre\}\}/gi, firstName || "");
+      const personalizedSubject = subject.trim().replace(/\{\{nombre\}\}/gi, firstName || "");
+
+      return transporter
         .sendMail({
           from: `Perú on Ice <${GMAIL_USER}>`,
           to: email,
-          subject: subject.trim(),
-          html: emailHtml,
+          subject: personalizedSubject,
+          html: personalizedHtml,
         })
         .then(() => { sent++; })
-        .catch(() => { failed++; })
-    );
+        .catch(() => { failed++; });
+    });
 
     await Promise.all(batchPromises);
   }
 
-  // Actualizar campaña
   if (campaign?.id) {
     await supabase
       .from("email_campaigns")
       .update({
         sent_count: sent,
         failed_count: failed,
-        status: failed === uniqueEmails.length ? "failed" : "completed",
+        status: failed === recipients.length ? "failed" : "completed",
       })
       .eq("id", campaign.id);
   }
 
-  return NextResponse.json({ sent, failed, total: uniqueEmails.length });
+  return NextResponse.json({ sent, failed, total: recipients.length });
 }

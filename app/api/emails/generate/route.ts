@@ -29,7 +29,7 @@ Tu trabajo es crear un correo COMPLETO que convierta. Debes generar TODOS estos 
 1. **template**: Elige la mejor plantilla entre: "promocion" (descuentos, ofertas), "evento" (fechas especiales, shows), "informativo" (noticias, horarios), "especial" (celebraciones, temporadas)
 2. **title**: Un asunto de email irresistible, máximo 60 caracteres. Debe generar curiosidad o urgencia.
 3. **badge**: Una etiqueta corta y llamativa (ej: "50% OFF", "2x1", "GRATIS", "⭐ VIP", "🎄"). Si no aplica, déjalo vacío.
-4. **body**: El cuerpo del correo. 3-5 párrafos cortos. Tono cercano, entusiasta, persuasivo. Español peruano natural. Incluye: gancho emocional, beneficio claro, sentido de urgencia. NO incluyas links, saludos formales, ni firma.
+4. **body**: El cuerpo del correo. SIEMPRE empieza con "Hola {{nombre}}," (esto se reemplazará automáticamente con el nombre real del cliente). 3-5 párrafos cortos. Tono cercano, entusiasta, persuasivo. Español peruano natural. Incluye: gancho emocional, beneficio claro, sentido de urgencia. NO incluyas links, saludos formales al final, ni firma.
 5. **ctaText**: Texto del botón de acción (ej: "Reservar ahora", "Quiero ir", "Ver horarios"). Corto y con verbo de acción.
 
 RESPONDE SOLO CON UN JSON VÁLIDO, sin markdown, sin backticks, sin explicación. Ejemplo:

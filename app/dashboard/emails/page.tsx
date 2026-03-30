@@ -17,7 +17,7 @@ export default async function EmailsPage({
   // Query con join a contracts para nombre y DNI
   let query = supabase
     .from("contract_emails")
-    .select("id, email, created_at, contract_id, contracts(adult_name, adult_dni)", { count: "exact" })
+    .select("id, email, created_at, contract_id, manual_name, contracts(adult_name, adult_dni)", { count: "exact" })
     .order("created_at", { ascending: false });
 
   if (search) {

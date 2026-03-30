@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { TEMPLATES, generateEmailHtml, type TemplateName, type TemplateFields } from "@/lib/email-templates";
 
@@ -27,6 +27,9 @@ export default function ComposeEmailPage() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const selectedIds = searchParams.get("selected")?.split(",").filter(Boolean) ?? [];
+  const isSelective = selectedIds.length > 0;
 
   const generated = template !== null && title.length > 0 && body.length > 0;
 
@@ -76,7 +79,7 @@ export default function ComposeEmailPage() {
       const res = await fetch("/api/emails/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ subject: title, body, templateFields: fields }),
+        body: JSON.stringify({ subject: title, body, templateFields: fields, ...(isSelective ? { selectedIds } : {}) }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || "Error al enviar"); return; }
@@ -161,8 +164,14 @@ export default function ComposeEmailPage() {
               ) : "✨ Crear correo con IA"}
             </button>
 
+            {isSelective && (
+              <div className="bg-burgundy/5 border border-burgundy/20 rounded-lg px-3 py-2 text-center">
+                <p className="text-xs text-burgundy font-bold">Envío a {selectedIds.length} correo{selectedIds.length !== 1 ? "s" : ""} seleccionado{selectedIds.length !== 1 ? "s" : ""}</p>
+              </div>
+            )}
+
             <p className="text-[10px] text-center text-dark-soft/30">
-              Puedes editar todo después de generar
+              Usa <span className="font-bold text-violet-500">{"{{nombre}}"}</span> en tu idea para personalizar con el nombre del cliente · Puedes editar todo después de generar
             </p>
           </div>
         </div>
@@ -259,7 +268,7 @@ export default function ComposeEmailPage() {
               </button>
               <button onClick={() => setShowConfirm(true)} disabled={!generated || sending}
                 className="flex-1 py-3.5 bg-burgundy text-white font-bold rounded-2xl hover:bg-burgundy-dark transition-all disabled:opacity-50 shadow-lg shadow-burgundy/20 text-sm">
-                {sending ? "Enviando..." : "Enviar a todos"}
+                {sending ? "Enviando..." : isSelective ? `Enviar a ${selectedIds.length} seleccionados` : "Enviar a todos"}
               </button>
             </div>
           </div>
