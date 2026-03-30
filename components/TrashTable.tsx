@@ -30,6 +30,8 @@ export default function TrashTable({ contracts, search, currentPage, totalPages 
   const pathname = usePathname();
   const [q, setQ] = useState(search);
   const [restoring, setRestoring] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,13 +44,24 @@ export default function TrashTable({ contracts, search, currentPage, totalPages 
     setRestoring(contractId);
     try {
       const res = await fetch(`/api/contracts/${contractId}`, { method: "PATCH" });
-      if (res.ok) {
-        router.refresh();
-      }
+      if (res.ok) router.refresh();
     } catch {
-      // silencioso — el refresh mostrará el estado real
+      // silencioso
     } finally {
       setRestoring(null);
+    }
+  };
+
+  const handlePermanentDelete = async (contractId: string) => {
+    setConfirmDelete(null);
+    setDeleting(contractId);
+    try {
+      const res = await fetch(`/api/contracts/${contractId}`, { method: "PUT" });
+      if (res.ok) router.refresh();
+    } catch {
+      // silencioso
+    } finally {
+      setDeleting(null);
     }
   };
 
@@ -103,13 +116,22 @@ export default function TrashTable({ contracts, search, currentPage, totalPages 
                   <td className="px-5 py-3.5 text-sm text-dark-soft/60">{formatDate(c.signed_at)}</td>
                   <td className="px-5 py-3.5 text-sm text-red-400">{formatDate(c.deleted_at)}</td>
                   <td className="px-5 py-3.5">
-                    <button
-                      onClick={() => handleRestore(c.id)}
-                      disabled={restoring === c.id}
-                      className="px-4 py-1.5 bg-green-50 text-green-600 border border-green-200 rounded-lg text-xs font-bold hover:bg-green-100 transition-all disabled:opacity-50"
-                    >
-                      {restoring === c.id ? "Restaurando..." : "Restaurar"}
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleRestore(c.id)}
+                        disabled={restoring === c.id}
+                        className="px-3 py-1.5 bg-green-50 text-green-600 border border-green-200 rounded-lg text-xs font-bold hover:bg-green-100 transition-all disabled:opacity-50"
+                      >
+                        {restoring === c.id ? "..." : "Restaurar"}
+                      </button>
+                      <button
+                        onClick={() => setConfirmDelete(c.id)}
+                        disabled={deleting === c.id}
+                        className="px-3 py-1.5 bg-red-50 text-red-600 border border-red-200 rounded-lg text-xs font-bold hover:bg-red-100 transition-all disabled:opacity-50"
+                      >
+                        {deleting === c.id ? "..." : "Eliminar"}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))
@@ -128,13 +150,22 @@ export default function TrashTable({ contracts, search, currentPage, totalPages 
               <p className="text-sm font-bold text-dark">{c.adult_name}</p>
               <p className="text-xs text-dark-soft">{c.adult_dni} · Firmado: {formatDate(c.signed_at)}</p>
               <p className="text-xs text-red-400">Eliminado: {formatDate(c.deleted_at)}</p>
-              <button
-                onClick={() => handleRestore(c.id)}
-                disabled={restoring === c.id}
-                className="px-4 py-1.5 bg-green-50 text-green-600 border border-green-200 rounded-lg text-xs font-bold hover:bg-green-100 transition-all disabled:opacity-50"
-              >
-                {restoring === c.id ? "Restaurando..." : "Restaurar"}
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleRestore(c.id)}
+                  disabled={restoring === c.id}
+                  className="px-3 py-1.5 bg-green-50 text-green-600 border border-green-200 rounded-lg text-xs font-bold hover:bg-green-100 transition-all disabled:opacity-50"
+                >
+                  {restoring === c.id ? "..." : "Restaurar"}
+                </button>
+                <button
+                  onClick={() => setConfirmDelete(c.id)}
+                  disabled={deleting === c.id}
+                  className="px-3 py-1.5 bg-red-50 text-red-600 border border-red-200 rounded-lg text-xs font-bold hover:bg-red-100 transition-all disabled:opacity-50"
+                >
+                  {deleting === c.id ? "..." : "Eliminar"}
+                </button>
+              </div>
             </div>
           ))
         )}
@@ -159,6 +190,32 @@ export default function TrashTable({ contracts, search, currentPage, totalPages 
               </a>
             );
           })}
+        </div>
+      )}
+      {/* Modal confirmación borrado permanente */}
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
+            <div className="flex items-center justify-center w-14 h-14 rounded-full bg-red-50 mx-auto mb-4">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                <line x1="12" y1="9" x2="12" y2="13" />
+                <line x1="12" y1="17" x2="12.01" y2="17" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-bold text-dark text-center mb-2">¿Eliminar permanentemente?</h3>
+            <p className="text-sm text-dark-soft/60 text-center mb-6">
+              Se borrará el contrato, los menores, la firma y el correo asociado. Esta acción no se puede deshacer.
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => setConfirmDelete(null)} className="flex-1 py-3 border-2 border-ice-dark/40 text-dark-soft/70 rounded-xl font-bold hover:bg-frost transition-all">
+                Cancelar
+              </button>
+              <button onClick={() => handlePermanentDelete(confirmDelete)} className="flex-1 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-all">
+                Sí, eliminar
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
